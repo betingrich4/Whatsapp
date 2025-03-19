@@ -8,14 +8,14 @@ const play = async (_0x126590, _0x3b9015) => {
 
   if (_0x588373 === 'play') {
     if (!_0x195e93) {
-      return _0x126590.reply("❌ *Please provide a search query!*");
+      return _0x126590.reply("*Please provide a search query!*");
     }
     await _0x126590.React('⏳');
 
     try {
       const _0x3e2e17 = await _0x1e4301(_0x195e93);
       if (!_0x3e2e17.videos.length) {
-        return _0x126590.reply("❌ *No results found!*");
+        return _0x126590.reply("*No results found!*");
       }
 
       const _0x13d1e1 = _0x3e2e17.videos[0x0];
@@ -61,54 +61,36 @@ const play = async (_0x126590, _0x3b9015) => {
           let _0x3fb4a3;
 
           if (_0x8cd70e === '1') {
+            _0x47e056 = "https://www.dark-yasiya-api.site/download/ytmp4?url=" + encodeURIComponent(_0x2da495);
             _0x5cf09a = "video";
             _0x2f856d = "> *ᴍᴀᴅᴇ ʙʏ ᴄʀᴇᴡ sʟᴀʏᴇʀ**";
           } else if (_0x8cd70e === '2') {
+            _0x47e056 = 'https://www.dark-yasiya-api.site/download/ytmp3?url=' + encodeURIComponent(_0x2da495);
             _0x5cf09a = "audio";
             _0x3fb4a3 = "audio/mpeg";
             _0x2f856d = "> *ᴍᴀᴅᴇ ʙʏ ᴄʀᴇᴡ sʟᴀʏᴇʀ*";
           } else if (_0x8cd70e === '3') {
+            _0x47e056 = "https://www.dark-yasiya-api.site/download/ytmp4?url=" + encodeURIComponent(_0x2da495);
             _0x5cf09a = "document";
             _0x3fb4a3 = "video/mp4";
             _0x2f856d = "> *ᴍᴀᴅᴇ ʙʏ ᴄʀᴇᴡ sʟᴀʏᴇʀ*";
           } else if (_0x8cd70e === '4') {
+            _0x47e056 = "https://www.dark-yasiya-api.site/download/ytmp3?url=" + encodeURIComponent(_0x2da495);
             _0x5cf09a = "document";
             _0x3fb4a3 = "audio/mpeg";
             _0x2f856d = "> *ᴍᴀᴅᴇ ʙʏ ᴄʀᴇᴡ sʟᴀʏᴇʀ*";
           } else {
-            return _0x126590.reply("❌ *Invalid selection! Please reply with 1, 2, 3, or 4.*");
+            return _0x126590.reply("*Invalid selection! Please reply with 1, 2, 3, or 4.*");
           }
 
-          // List of APIs to try
-          const apis = [
-            `https://api-rin-tohsaka.vercel.app/download/ytmp4?url=${encodeURIComponent(_0x2da495)}`,
-            `https://api.davidcyriltech.my.id/download/ytmp3?url=${encodeURIComponent(_0x2da495)}`,
-            `https://www.dark-yasiya-api.site/download/ytmp3?url=${encodeURIComponent(_0x2da495)}`,
-            `https://api.giftedtech.web.id/api/download/dlmp3?url=${encodeURIComponent(_0x2da495)}&apikey=rahmani-md`,
-            `https://api.dreaded.site/api/ytdl/audio?url=${encodeURIComponent(_0x2da495)}`
-          ];
+          const _0x488045 = await fetch(_0x47e056);
+          const _0x2f9ea8 = await _0x488045.json();
 
-          let _0x2a88ca;
-          let _0x2f9ea8;
-
-          for (const api of apis) {
-            try {
-              const _0x488045 = await fetch(api);
-              _0x2f9ea8 = await _0x488045.json();
-
-              if (_0x2f9ea8.success) {
-                _0x2a88ca = _0x2f9ea8.result.download_url;
-                break; // Exit loop if successful
-              }
-            } catch (_0x1933b6) {
-              console.error("Error with API:", api, _0x1933b6);
-            }
+          if (!_0x2f9ea8.success) {
+            return _0x126590.reply("*Download failed, please try again.*");
           }
 
-          if (!_0x2a88ca) {
-            return _0x126590.reply("❌ *All download attempts failed. Please try again later.*");
-          }
-
+          const _0x2a88ca = _0x2f9ea8.result.download_url;
           const _0x9086db = {
             'url': _0x2a88ca
           };
@@ -135,7 +117,7 @@ const play = async (_0x126590, _0x3b9015) => {
       });
     } catch (_0x1933b6) {
       console.error("Error:", _0x1933b6);
-      return _0x126590.reply("❌ *An error occurred while processing your request.*");
+      return _0x126590.reply("*An error occurred while processing your request.*");
     }
   }
 };
@@ -165,4 +147,4 @@ function _0x3d3f65(_0x368816) {
       _0x9b3a81(0x0);
     }
   } catch (_0x3e2253) {}
-      }
+              }
