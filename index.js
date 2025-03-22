@@ -49,6 +49,7 @@ if (!fs.existsSync(sessionDir)) {
 
 // Store warnings for each user
 const userWarnings = new Map();
+const linkWarnings = new Map(); // For antilink feature
 
 async function downloadSessionData() {
     if (!config.SESSION_ID) {
@@ -145,7 +146,7 @@ async function start() {
                     try {
                         await Matrix.readMessages([mek.key]);
                     } catch (error) {
-                        console.error('❌ Error marking status as viewed:', error);
+                        console.error('*Error marking status as viewed:*', error);
                     }
                 }
 
@@ -155,6 +156,56 @@ async function start() {
                         await Matrix.sendMessage(mek.key.remoteJid, { react: { text: '❤️,🐥', key: mek.key } });
                     } catch (error) {
                         console.error('*Error reacting to status:*', error);
+                    }
+                }
+
+                // **ANTILINK: Detect and delete links**
+                if (config.ANTILINK && m.isGroup) {
+                    const linkRegex = /https?:\/\/[^\s]+/i;
+                    const containsLink = linkRegex.test(mek.body);
+
+                    if (containsLink) {
+                        const sender = mek.key.participant || mek.key.remoteJid;
+                        const groupMetadata = await Matrix.groupMetadata(mek.key.remoteJid);
+                        const isAdmin = groupMetadata.participants.find(participant => participant.id === sender)?.admin === 'admin';
+
+                        // Skip if the sender is an admin
+                        if (isAdmin) return;
+
+                        // Delete the message containing the link
+                        try {
+                            await Matrix.sendMessage(mek.key.remoteJid, { delete: mek.key });
+                        } catch (error) {
+                            console.error('Failed to delete message:', error);
+                        }
+
+                        // Get the number of warnings for this user
+                        const warnings = linkWarnings.get(sender) || 0;
+
+                        if (warnings < 1) {
+                            // Warn the user
+                            linkWarnings.set(sender, warnings + 1);
+                            await Matrix.sendMessage(mek.key.remoteJid, {
+                                text: `*Warning ${warnings + 1}/1: Please do not send links in this group. Next violation will result in removal.*`,
+                                mentions: [sender],
+                            }, { quoted: mek });
+                        } else {
+                            // Remove the user after 1 warning
+                            try {
+                                await Matrix.groupParticipantsUpdate(mek.key.remoteJid, [sender], 'remove');
+                                await Matrix.sendMessage(mek.key.remoteJid, {
+                                    text: `*@${sender.split('@')[0]} has been removed for sending links.*`,
+                                    mentions: [sender],
+                                }, { quoted: mek });
+                                linkWarnings.delete(sender); // Reset warnings after removal
+                            } catch (error) {
+                                console.error('Failed to remove user:', error);
+                                await Matrix.sendMessage(mek.key.remoteJid, {
+                                    text: `*Failed to remove @${sender.split('@')[0]}. Please check bot permissions.*`,
+                                    mentions: [sender],
+                                }, { quoted: mek });
+                            }
+                        }
                     }
                 }
 
@@ -174,7 +225,7 @@ async function start() {
                         // Warn the user
                         userWarnings.set(sender, warnings + 1);
                         await Matrix.sendMessage(mek.key.remoteJid, {
-                            text: `⚠️ Warning ${warnings + 1}/2: Please do not use other bots in this group. Next violation will result in removal.`,
+                            text: `*Warning ${warnings + 1}/2: Please do not use other bots in this group. Next violation will result in removal.*`,
                             mentions: [sender],
                         }, { quoted: mek });
                     } else {
@@ -182,14 +233,14 @@ async function start() {
                         try {
                             await Matrix.groupParticipantsUpdate(mek.key.remoteJid, [sender], 'remove');
                             await Matrix.sendMessage(mek.key.remoteJid, {
-                                text: `🚫 @${sender.split('@')[0]} has been removed for using other bots.`,
+                                text: `*@${sender.split('@')[0]} has been removed for using other bots.*`,
                                 mentions: [sender],
                             }, { quoted: mek });
                             userWarnings.delete(sender); // Reset warnings after removal
                         } catch (error) {
                             console.error('Failed to remove user:', error);
                             await Matrix.sendMessage(mek.key.remoteJid, {
-                                text: `❌ Failed to remove @${sender.split('@')[0]}. Please check bot permissions.`,
+                                text: `*Failed to remove @${sender.split('@')[0]}. Please Make Demon-Slayer admin.*`,
                                 mentions: [sender],
                             }, { quoted: mek });
                         }
@@ -209,12 +260,12 @@ async function start() {
 
 async function init() {
     if (fs.existsSync(credsPath)) {
-        console.log("🔒 Session file found, proceeding without QR code.");
+        console.log("Session file found, proceeding without QR code.");
         await start();
     } else {
         const sessionDownloaded = await downloadSessionData();
         if (sessionDownloaded) {
-            console.log("🔒 Session downloaded, starting bot.");
+            console.log("Session downloaded, starting bot.");
             await start();
         } else {
             console.log("No session found or downloaded, QR code will be printed for authentication.");
