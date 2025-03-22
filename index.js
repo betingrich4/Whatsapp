@@ -69,17 +69,6 @@ async function downloadSessionData() {
     }
 }
 
-// Function to update the bot's bio
-async function updateBio(Matrix) {
-    try {
-        const bioTemplate = `${config.BOT_NAME}|${moment().tz("Africa/Nairobi").format("HH:mm:ss")}`;
-        await Matrix.updateProfileStatus(bioTemplate);
-        console.log(chalk.green(`Bio updated: ${bioTemplate}`));
-    } catch (error) {
-        console.error(chalk.red('Error updating bio:'), error);
-    }
-}
-
 async function start() {
     try {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
@@ -124,11 +113,6 @@ async function start() {
 > *ᴍᴀᴅᴇ ʙʏ 3 ᴍᴇɴ ᴀʀᴍʏ*`
                     });
                     initialConnection = false;
-
-                    // Update bio on initial connection
-                    if (config.AUTO_BIO) {
-                        await updateBio(Matrix);
-                    }
                 } else {
                     console.log(chalk.blue("Connection reestablished after restart."));
                 }
@@ -161,7 +145,7 @@ async function start() {
                 if (config.AUTO_STATUS_VIEW && mek.key.remoteJid.endsWith('@broadcast') && (mek.message?.imageMessage || mek.message?.videoMessage)) {
                     try {
                         await Matrix.readMessages([mek.key]);
-                        console.log(chalk.green(`Viewed status from ${mek.key.participant || mek.key.remoteJid}`));
+                        console.log(chalk.green(`✅ Viewed status from ${mek.key.participant || mek.key.remoteJid}`));
                     } catch (error) {
                         console.error('❌ Error marking status as viewed:', error);
                     }
@@ -268,13 +252,6 @@ async function start() {
                 console.error('Error during auto reaction/status reaction:', err);
             }
         });
-
-        // Update bio periodically if AUTO_BIO is enabled
-        if (config.AUTO_BIO) {
-            setInterval(async () => {
-                await updateBio(Matrix);
-            }, 60000); // Update bio every 60 seconds
-        }
 
     } catch (error) {
         console.error('Critical Error:', error);
