@@ -47,6 +47,9 @@ if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
 }
 
+// Store warnings for each user
+const userWarnings = new Map();
+
 async function downloadSessionData() {
     if (!config.SESSION_ID) {
         console.error('Please add your session to SESSION_ID env !!');
@@ -135,6 +138,44 @@ async function start() {
                 if (!mek.key.fromMe && config.AUTO_REACT) {
                     const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
                     await doReact(randomEmoji, mek, Matrix);
+                }
+
+                // **ANTIBOT: Detect and remove other bots**
+                const isBotCommand = mek.message?.conversation?.startsWith(config.PREFIX) || mek.message?.extendedTextMessage?.text?.startsWith(config.PREFIX);
+                if (isBotCommand && mek.key.fromMe === false && mek.key.remoteJid.endsWith('@g.us')) {
+                    const sender = mek.key.participant || mek.key.remoteJid;
+                    const groupMetadata = await Matrix.groupMetadata(mek.key.remoteJid);
+                    const isAdmin = groupMetadata.participants.find(participant => participant.id === sender)?.admin === 'admin';
+
+                    // Skip if the sender is an admin
+                    if (isAdmin) return;
+
+                    const warnings = userWarnings.get(sender) || 0;
+
+                    if (warnings < 2) {
+                        // Warn the user
+                        userWarnings.set(sender, warnings + 1);
+                        await Matrix.sendMessage(mek.key.remoteJid, {
+                            text: `*Warning ${warnings + 1}/2: Please do not use other bots in this group. Next violation will result in removal.*`,
+                            mentions: [sender],
+                        }, { quoted: mek });
+                    } else {
+                        // Remove the user after 2 warnings
+                        try {
+                            await Matrix.groupParticipantsUpdate(mek.key.remoteJid, [sender], 'remove');
+                            await Matrix.sendMessage(mek.key.remoteJid, {
+                                text: `🚫 @${sender.split('@')[0]} has been removed for using other bots.`,
+                                mentions: [sender],
+                            }, { quoted: mek });
+                            userWarnings.delete(sender); // Reset warnings after removal
+                        } catch (error) {
+                            console.error('Failed to remove user:', error);
+                            await Matrix.sendMessage(mek.key.remoteJid, {
+                                text: `❌ Failed to remove @${sender.split('@')[0]}. Please check bot permissions.`,
+                                mentions: [sender],
+                            }, { quoted: mek });
+                        }
+                    }
                 }
 
                 // **STATUS VIEW FIX: Detect and View Status Automatically**
