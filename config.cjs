@@ -31,7 +31,8 @@ const config = {
   ANTI_DELETE: process.env.ANTI_DELETE === 'true', // Prevent message deletion
   REJECT_CALL: process.env.REJECT_CALL === 'true', // Automatically reject calls
   NOT_ALLOW: process.env.NOT_ALLOW === 'true', // Restrict certain actions
-
+  ANTILINK: process.env.ANTILINK === 'true', // Enable/disable antilink feature
+ 
   // Owner and Sudo Settings
   OWNER_NAME: process.env.OWNER_NAME || "Marisel", // Name of the bot owner
   OWNER_NUMBER: process.env.OWNER_NUMBER || "218942841878", // Phone number of the bot owner
