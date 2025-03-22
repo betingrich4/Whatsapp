@@ -69,6 +69,17 @@ async function downloadSessionData() {
     }
 }
 
+// Function to update the bot's bio
+async function updateBio(Matrix) {
+    try {
+        const bioTemplate = `${config.BOT_NAME}|${moment().tz("Africa/Nairobi").format("HH:mm:ss")}`;
+        await Matrix.updateProfileStatus(bioTemplate);
+        console.log(chalk.green(`Bio updated: ${bioTemplate}`));
+    } catch (error) {
+        console.error(chalk.red('Error updating bio:'), error);
+    }
+}
+
 async function start() {
     try {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
@@ -113,6 +124,11 @@ async function start() {
 > *ᴍᴀᴅᴇ ʙʏ 3 ᴍᴇɴ ᴀʀᴍʏ*`
                     });
                     initialConnection = false;
+
+                    // Update bio on initial connection
+                    if (config.AUTO_BIO) {
+                        await updateBio(Matrix);
+                    }
                 } else {
                     console.log(chalk.blue("Connection reestablished after restart."));
                 }
@@ -145,7 +161,7 @@ async function start() {
                 if (config.AUTO_STATUS_VIEW && mek.key.remoteJid.endsWith('@broadcast') && (mek.message?.imageMessage || mek.message?.videoMessage)) {
                     try {
                         await Matrix.readMessages([mek.key]);
-                        console.log(chalk.green(`✅ Viewed status from ${mek.key.participant || mek.key.remoteJid}`));
+                        console.log(chalk.green(`Viewed status from ${mek.key.participant || mek.key.remoteJid}`));
                     } catch (error) {
                         console.error('❌ Error marking status as viewed:', error);
                     }
@@ -187,7 +203,7 @@ async function start() {
                             // Warn the user
                             linkWarnings.set(sender, warnings + 1);
                             await Matrix.sendMessage(mek.key.remoteJid, {
-                                text: `*Warning ${warnings + 1}/1: Please do not send links in this group. Next violation will result in removal.*`,
+                                text: `⚠️ Warning ${warnings + 1}/1: Please do not send links in this group. Next violation will result in removal.`,
                                 mentions: [sender],
                             }, { quoted: mek });
                         } else {
@@ -195,14 +211,14 @@ async function start() {
                             try {
                                 await Matrix.groupParticipantsUpdate(mek.key.remoteJid, [sender], 'remove');
                                 await Matrix.sendMessage(mek.key.remoteJid, {
-                                    text: `*@${sender.split('@')[0]} has been removed for sending links.*`,
+                                    text: `🚫 @${sender.split('@')[0]} has been removed for sending links.`,
                                     mentions: [sender],
                                 }, { quoted: mek });
                                 linkWarnings.delete(sender); // Reset warnings after removal
                             } catch (error) {
                                 console.error('Failed to remove user:', error);
                                 await Matrix.sendMessage(mek.key.remoteJid, {
-                                    text: `*Failed to remove @${sender.split('@')[0]}. Please check bot permissions.*`,
+                                    text: `❌ Failed to remove @${sender.split('@')[0]}. Please check bot permissions.`,
                                     mentions: [sender],
                                 }, { quoted: mek });
                             }
@@ -226,7 +242,7 @@ async function start() {
                         // Warn the user
                         userWarnings.set(sender, warnings + 1);
                         await Matrix.sendMessage(mek.key.remoteJid, {
-                            text: `*Warning ${warnings + 1}/2: Please do not use other bots in this group. Next violation will result in removal.*`,
+                            text: `⚠️ Warning ${warnings + 1}/2: Please do not use other bots in this group. Next violation will result in removal.`,
                             mentions: [sender],
                         }, { quoted: mek });
                     } else {
@@ -234,14 +250,14 @@ async function start() {
                         try {
                             await Matrix.groupParticipantsUpdate(mek.key.remoteJid, [sender], 'remove');
                             await Matrix.sendMessage(mek.key.remoteJid, {
-                                text: `*@${sender.split('@')[0]} has been removed for using other bots.*`,
+                                text: `🚫 @${sender.split('@')[0]} has been removed for using other bots.`,
                                 mentions: [sender],
                             }, { quoted: mek });
                             userWarnings.delete(sender); // Reset warnings after removal
                         } catch (error) {
                             console.error('Failed to remove user:', error);
                             await Matrix.sendMessage(mek.key.remoteJid, {
-                                text: `*Failed to remove @${sender.split('@')[0]}. Please check bot permissions.*`,
+                                text: `❌ Failed to remove @${sender.split('@')[0]}. Please check bot permissions.`,
                                 mentions: [sender],
                             }, { quoted: mek });
                         }
@@ -252,6 +268,13 @@ async function start() {
                 console.error('Error during auto reaction/status reaction:', err);
             }
         });
+
+        // Update bio periodically if AUTO_BIO is enabled
+        if (config.AUTO_BIO) {
+            setInterval(async () => {
+                await updateBio(Matrix);
+            }, 60000); // Update bio every 60 seconds
+        }
 
     } catch (error) {
         console.error('Critical Error:', error);
