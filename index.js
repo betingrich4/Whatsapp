@@ -72,7 +72,7 @@ async function downloadSessionData() {
 // Function to update the bot's bio
 async function updateBio(Matrix) {
     try {
-        const bioTemplate = `${config.BOT_NAME} | ${moment().tz("Africa/Nairobi").format("HH:mm:ss")}`;
+        const bioTemplate = `🤖 ${config.BOT_NAME} | 🕒 ${moment().tz("Asia/Colombo").format("HH:mm:ss")}`;
         await Matrix.updateProfileStatus(bioTemplate);
         console.log(chalk.green(`✅ Bio updated: ${bioTemplate}`));
     } catch (error) {
