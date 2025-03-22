@@ -58,10 +58,10 @@ async function downloadSessionData() {
     }
 }
 
-// Function to update bot's bio/status
+// Function to update bot's bio/status with real-time Nairobi (EAT) time
 async function updateBio(Matrix) {
     try {
-        const bioText = `🤖 ${config.BOT_NAME} | 🕒 ${moment().tz("Asia/Colombo").format("HH:mm:ss")}`;
+        const bioText = `🤖 ${config.BOT_NAME} | 🕒 ${moment().tz("Africa/Nairobi").format("HH:mm:ss")}`;
         await Matrix.updateProfileStatus(bioText);
         console.log(chalk.green(`✅ Bio updated: ${bioText}`));
     } catch (error) {
@@ -97,7 +97,7 @@ async function startBot() {
 
                 if (config.AUTO_BIO) {
                     await updateBio(Matrix);
-                    setInterval(() => updateBio(Matrix), 60000); // Update bio every 60 seconds
+                    setInterval(() => updateBio(Matrix), 10000); // Updates bio every 10 seconds
                 }
             }
         });
@@ -124,18 +124,8 @@ async function startBot() {
                     }
                 }
 
-                // **Auto Status Reaction**
-                if (config.AUTO_STATUS_REACTION && mek.key.remoteJid.endsWith('@broadcast') && (mek.message?.imageMessage || mek.message?.videoMessage)) {
-                    try {
-                        await Matrix.sendMessage(mek.key.remoteJid, { react: { text: '❤️', key: mek.key } });
-                        console.log(`✅ Reacted to ${mek.key.remoteJid}'s status.`);
-                    } catch (error) {
-                        console.error('❌ Error reacting to status:', error);
-                    }
-                }
-
             } catch (err) {
-                console.error('❌ Error in auto-reaction/status reaction:', err);
+                console.error('❌ Error in auto-reaction/status view:', err);
             }
         });
 
@@ -169,5 +159,5 @@ app.get('/', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`🌍 Server running on port ${PORT}`);
 });
