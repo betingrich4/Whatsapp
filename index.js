@@ -58,16 +58,16 @@ async function downloadSessionData() {
 
     const sessdata = config.SESSION_ID.split("Demon-Slayer~")[1];
 
-    if (!sessdata || !sessdata.includes("#")) {
+    if (!sessdata || !sessdata.includes("~")) {
         console.error('❌ Invalid SESSION_ID format! It must contain both file ID and decryption key.');
         return false;
     }
 
-    const [fileID, decryptKey] = sessdata.split("#");
+    const [fileID, decryptKey] = sessdata.split("~");
 
     try {
-        console.log("🔄 Downloading Session...");
-        const file = File.fromURL(`https://mega.nz/file/${fileID}#${decryptKey}`);
+        console.log("Downloading Session...");
+        const file = File.fromURL(`https://mega.nz/file/${fileID}~${decryptKey}`);
 
         const data = await new Promise((resolve, reject) => {
             file.download((err, data) => {
@@ -89,13 +89,13 @@ async function start() {
     try {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
         const { version, isLatest } = await fetchLatestBaileysVersion();
-        console.log(`🤖 JAWAD-MD using WA v${version.join('.')}, isLatest: ${isLatest}`);
+        console.log(`Demon-Slayer using WA v${version.join('.')}, isLatest: ${isLatest}`);
         
         const Matrix = makeWASocket({
             version,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: useQR,
-            browser: ["JAWAD-MD", "safari", "3.3"],
+            browser: ["Demon", "safari", "3.3"],
             auth: state,
             getMessage: async (key) => {
                 if (store) {
