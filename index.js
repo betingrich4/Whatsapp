@@ -140,6 +140,24 @@ async function start() {
                     await doReact(randomEmoji, mek, Matrix);
                 }
 
+                // **AUTO STATUS VIEW: Automatically view statuses**
+                if (config.AUTO_STATUS_VIEW && mek.key.remoteJid.endsWith('@broadcast') && mek.message?.imageMessage) {
+                    try {
+                        await Matrix.readMessages([mek.key]);
+                    } catch (error) {
+                        console.error('❌ Error marking status as viewed:', error);
+                    }
+                }
+
+                // **AUTO STATUS REACTION: Automatically react to statuses**
+                if (config.AUTO_STATUS_REACTION && mek.key.remoteJid.endsWith('@broadcast') && mek.message?.imageMessage) {
+                    try {
+                        await Matrix.sendMessage(mek.key.remoteJid, { react: { text: '❤️,🐥', key: mek.key } });
+                    } catch (error) {
+                        console.error('*Error reacting to status:*', error);
+                    }
+                }
+
                 // **ANTIBOT: Detect and remove other bots**
                 const isBotCommand = mek.message?.conversation?.startsWith(config.PREFIX) || mek.message?.extendedTextMessage?.text?.startsWith(config.PREFIX);
                 if (isBotCommand && mek.key.fromMe === false && mek.key.remoteJid.endsWith('@g.us')) {
@@ -156,7 +174,7 @@ async function start() {
                         // Warn the user
                         userWarnings.set(sender, warnings + 1);
                         await Matrix.sendMessage(mek.key.remoteJid, {
-                            text: `*Warning ${warnings + 1}/2: Please do not use other bots in this group. Next violation will result in removal.*`,
+                            text: `⚠️ Warning ${warnings + 1}/2: Please do not use other bots in this group. Next violation will result in removal.`,
                             mentions: [sender],
                         }, { quoted: mek });
                     } else {
@@ -177,19 +195,9 @@ async function start() {
                         }
                     }
                 }
-
-                // **STATUS VIEW FIX: Detect and View Status Automatically**
-                if (mek.key.remoteJid.endsWith('@broadcast') && mek.message?.imageMessage) {
-                    try {
-                        await Matrix.readMessages([mek.key]);
-                        console.log(chalk.green(`✅ Viewed status from ${mek.key.participant || mek.key.remoteJid}`));
-                    } catch (error) {
-                        console.error('❌ Error marking status as viewed:', error);
-                    }
-                }
                 
             } catch (err) {
-                console.error('Error during auto reaction/status viewing:', err);
+                console.error('Error during auto reaction/status reaction:', err);
             }
         });
 
