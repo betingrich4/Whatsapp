@@ -12,21 +12,15 @@ import { Handler, Callupdate, GroupUpdate } from './data/index.js';
 import express from 'express';
 import pino from 'pino';
 import fs from 'fs';
-import { File } from 'megajs';
-import NodeCache from 'node-cache';
+import axios from 'axios';
 import path from 'path';
 import chalk from 'chalk';
-import moment from 'moment-timezone';
-import axios from 'axios';
 import config from './config.cjs';
-import pkg from './lib/autoreact.cjs';
-const { emojis, doReact } = pkg;
+
 const prefix = process.env.PREFIX || config.PREFIX;
-const sessionName = "session";
-const app = express();
-const orange = chalk.bold.hex("#FFA500");
-const lime = chalk.bold.hex("#32CD32");
-let useQR = false;
+const sessionDir = path.join(process.cwd(), 'session');
+const credsPath = path.join(sessionDir, 'creds.json');
+const useQR = false;
 let initialConnection = true;
 const PORT = process.env.PORT || 3000;
 
@@ -36,55 +30,20 @@ const MAIN_LOGGER = pino({
 const logger = MAIN_LOGGER.child({});
 logger.level = "trace";
 
-const msgRetryCounterCache = new NodeCache();
-
-const __filename = new URL(import.meta.url).pathname;
-const __dirname = path.dirname(__filename);
-
-const sessionDir = path.join(__dirname, 'session');
-const credsPath = path.join(sessionDir, 'creds.json');
-
-if (!fs.existsSync(sessionDir)) {
-    fs.mkdirSync(sessionDir, { recursive: true });
-}
-
-async function downloadSessionData() {
-    if (!config.SESSION_ID) {
-        console.error('Please add your session to SESSION_ID env !!');
-        return false;
-    }
-    const sessdata = config.SESSION_ID.split("Demon-Slayer~")[1];
-    const url = `https://pastebin.com/raw/${sessdata}`;
-    try {
-        const response = await axios.get(url);
-        const data = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
-        await fs.promises.writeFile(credsPath, data);
-        console.log("🔒 Session Successfully Loaded !!");
-        return true;
-    } catch (error) {
-        return false;
-    }
-}
+const warnUsers = new Map(); // Stores warnings for both Anti-Link & Anti-Bot violations
 
 async function start() {
     try {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
         const { version, isLatest } = await fetchLatestBaileysVersion();
         console.log(`Demon-Slayer using WA v${version.join('.')}, isLatest: ${isLatest}`);
-        
+
         const Matrix = makeWASocket({
             version,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: useQR,
             browser: ["Demon", "safari", "3.3"],
             auth: state,
-            getMessage: async (key) => {
-                if (store) {
-                    const msg = await store.loadMessage(key.remoteJid, key.id);
-                    return msg.message || undefined;
-                }
-                return { conversation: "JAWAD-MD whatsapp user bot" };
-            }
         });
 
         Matrix.ev.on('connection.update', (update) => {
@@ -104,9 +63,7 @@ async function start() {
 ╭─────────────━┈⊷
 │ *ʙᴏᴛ ᴄᴏɴɴᴇᴄᴛᴇᴅ sᴜᴄᴄᴇssғᴜʟʟʏ*
 │ *ᴘʟᴇᴀsᴇ ғᴏʟʟᴏᴡ ᴜs ʙᴇʟᴏᴡ*
-╰─────────────━┈⊷
-
-> *ᴍᴀᴅᴇ ʙʏ 3 ᴍᴇɴ ᴀʀᴍʏ*`
+╰─────────────━┈⊷`
                     });
                     initialConnection = false;
                 } else {
@@ -114,107 +71,59 @@ async function start() {
                 }
             }
         });
-        
+
         Matrix.ev.on('creds.update', saveCreds);
 
+        // Anti-Link & Anti-Bot System
         Matrix.ev.on("messages.upsert", async chatUpdate => {
             try {
                 const mek = chatUpdate.messages[0];
+                if (!mek || !mek.message) return;
+                if (mek.key.fromMe) return;
+
                 const fromJid = mek.key.participant || mek.key.remoteJid;
-                const sender = mek.key.remoteJid;
-                const groupMetadata = await Matrix.groupMetadata(fromJid);
-                const isGroup = fromJid.endsWith('@g.us');
+                const textMessage = mek.message.conversation || mek.message.extendedTextMessage?.text || "";
+                const linkRegex = /(https?:\/\/[^\s]+)/gi;
+                const botKeywords = ["!help", ".help", "!menu", ".menu", "bot", "prefix"]; // Common bot commands
 
-                if (!mek || !mek.message || mek.key.fromMe || !isGroup) return;
-
-                // Antilink Logic
-                if (mek.message?.extendedTextMessage?.text || mek.message?.conversation) {
-                    const text = mek.message.extendedTextMessage?.text || mek.message.conversation;
-                    const linkRegex = /https?:\/\/[^\s]+/gi;
-
-                    if (linkRegex.test(text)) {
-                        const warnedUsers = new Set(); // Track warned users
-
-                        if (!warnedUsers.has(sender)) {
-                            // Warn the user
-                            await Matrix.sendMessage(fromJid, { text: `*${groupMetadata.subject} - Warning*: Please do not send links in this group.` }, { quoted: mek });
-                            warnedUsers.add(sender);
-                        } else {
-                            // Remove the user if they send a link again
-                            await Matrix.groupParticipantsUpdate(fromJid, [sender], 'remove');
-                            await Matrix.sendMessage(fromJid, { text: `*${groupMetadata.subject} - Action*: ${sender.split('@')[0]} has been removed for sending links.` });
+                // Anti-Link Detection
+                if (linkRegex.test(textMessage)) {
+                    if (!warnUsers.has(fromJid)) {
+                        warnUsers.set(fromJid, 1);
+                        await Matrix.sendMessage(fromJid, { text: "⚠️ Warning! Sending links is not allowed. If you send another link, you will be removed." }, { quoted: mek });
+                    } else {
+                        warnUsers.set(fromJid, warnUsers.get(fromJid) + 1);
+                        if (warnUsers.get(fromJid) >= 2) {
+                            await Matrix.groupParticipantsUpdate(fromJid, [mek.key.participant], "remove");
+                            warnUsers.delete(fromJid);
                         }
                     }
+                    await Matrix.sendMessage(fromJid, { delete: mek.key });
                 }
 
-                // Antibot Logic
-                if (mek.message?.extendedTextMessage?.text || mek.message?.conversation) {
-                    const text = mek.message.extendedTextMessage?.text || mek.message.conversation;
-                    const botCommandRegex = /\.menu|\.help|\.start|\.command/gi; // Add more bot commands as needed
-
-                    if (botCommandRegex.test(text)) {
-                        const warnedBots = new Set(); // Track warned bots
-
-                        if (!warnedBots.has(sender)) {
-                            // Warn the user
-                            await Matrix.sendMessage(fromJid, { text: `*${groupMetadata.subject} - Warning*: Please do not use bot commands in this group.` }, { quoted: mek });
-                            warnedBots.add(sender);
-                        } else {
-                            // Remove the user if they use bot commands again
-                            await Matrix.groupParticipantsUpdate(fromJid, [sender], 'remove');
-                            await Matrix.sendMessage(fromJid, { text: `*${groupMetadata.subject} - Action*: ${sender.split('@')[0]} has been removed for using bot commands.` });
+                // Anti-Bot Detection
+                if (botKeywords.some(keyword => textMessage.toLowerCase().includes(keyword))) {
+                    if (!warnUsers.has(fromJid)) {
+                        warnUsers.set(fromJid, 1);
+                        await Matrix.sendMessage(fromJid, { text: "⚠️ Warning! Using another bot in this group is not allowed. If you use your bot again, you will be removed." }, { quoted: mek });
+                    } else {
+                        warnUsers.set(fromJid, warnUsers.get(fromJid) + 1);
+                        if (warnUsers.get(fromJid) >= 2) {
+                            await Matrix.groupParticipantsUpdate(fromJid, [mek.key.participant], "remove");
+                            warnUsers.delete(fromJid);
                         }
                     }
+                    await Matrix.sendMessage(fromJid, { delete: mek.key });
                 }
+
+                await Handler(chatUpdate, Matrix, logger);
             } catch (err) {
-                console.error('Error handling antilink/antibot logic:', err);
+                console.error('Error handling messages.upsert event:', err);
             }
         });
 
         Matrix.ev.on("call", async (json) => await Callupdate(json, Matrix));
         Matrix.ev.on("group-participants.update", async (messag) => await GroupUpdate(Matrix, messag));
-
-        if (config.MODE === "public") {
-            Matrix.public = true;
-        } else if (config.MODE === "private") {
-            Matrix.public = false;
-        }
-
-        Matrix.ev.on('messages.upsert', async (chatUpdate) => {
-            try {
-                const mek = chatUpdate.messages[0];
-                console.log(mek);
-                if (!mek.key.fromMe && config.AUTO_REACT) {
-                    console.log(mek);
-                    if (mek.message) {
-                        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-                        await doReact(randomEmoji, mek, Matrix);
-                    }
-                }
-            } catch (err) {
-                console.error('Error during auto reaction:', err);
-            }
-        });
-        
-        Matrix.ev.on('messages.upsert', async (chatUpdate) => {
-            try {
-                const mek = chatUpdate.messages[0];
-                const fromJid = mek.key.participant || mek.key.remoteJid;
-                if (!mek || !mek.message) return;
-                if (mek.key.fromMe) return;
-                if (mek.message?.protocolMessage || mek.message?.ephemeralMessage || mek.message?.reactionMessage) return; 
-                if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
-                    await Matrix.readMessages([mek.key]);
-                    
-                    if (config.AUTO_STATUS_REPLY) {
-                        const customMessage = config.STATUS_READ_MSG || 'Auto Status Seen.';
-                        await Matrix.sendMessage(fromJid, { text: customMessage }, { quoted: mek });
-                    }
-                }
-            } catch (err) {
-                console.error('Error handling messages.upsert event:', err);
-            }
-        });
 
     } catch (error) {
         console.error('Critical Error:', error);
@@ -227,15 +136,8 @@ async function init() {
         console.log("🔒 Session file found, proceeding without QR code.");
         await start();
     } else {
-        const sessionDownloaded = await downloadSessionData();
-        if (sessionDownloaded) {
-            console.log("🔒 Session downloaded, starting bot.");
-            await start();
-        } else {
-            console.log("No session found or downloaded, QR code will be printed for authentication.");
-            useQR = true;
-            await start();
-        }
+        console.log("No session found. Please scan QR to log in.");
+        await start();
     }
 }
 
