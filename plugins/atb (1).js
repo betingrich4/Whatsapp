@@ -1,51 +1,69 @@
-import config from "../../config.cjs";
-import moment from "moment-timezone";
+import config from "../config.cjs";
+import chalk from "chalk";
 
-const autoBio = async (m, sock) => {
-  const prefix = config.PREFIX;
+let autoBioInterval = null; // To store the interval for auto-updating bio
 
-  // Check if the command is "autobio"
-  if (!m.body.startsWith(`${prefix}autobio`)) return;
+const autoBio = async (m, gss) => {
+  try {
+    const cmd = m.body.toLowerCase().trim();
 
-  // Check if AUTO_BIO is enabled in the config
-  if (!config.AUTO_BIO) {
-    return await sock.sendMessage(
-      m.from,
-      { text: "*Auto Bio is disabled in the config.*" },
-      { quoted: m }
-    );
-  }
+    // Enable autobio
+    if (cmd === "autobio on") {
+      // Check if the command is sent by the bot owner
+      const isOwner = [config.OWNER_NUMBER + '@s.whatsapp.net'].includes(m.sender);
+      if (!isOwner) {
+        return m.reply("*📛 THIS IS AN OWNER COMMAND*");
+      }
 
-  // Notify the user that Auto Bio is activated
-  await sock.sendMessage(
-    m.from,
-    { text: "*Auto Bio activated! Your bio will update every minute.*" },
-    { quoted: m }
-  );
+      // Start auto-updating bio
+      if (!autoBioInterval) {
+        autoBioInterval = setInterval(async () => {
+          try {
+            // Get current time and day
+            const now = new Date();
+            const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            const day = now.toLocaleDateString([], { weekday: "long" });
 
-  // Function to update the bio
-  const updateBio = async () => {
-    const uptimeSeconds = process.uptime(); // Get bot uptime in seconds
-    const hours = Math.floor((uptimeSeconds % (24 * 3600)) / 3600; // Calculate hours
-    const minutes = Math.floor((uptimeSeconds % 3600) / 60; // Calculate minutes
-    const seconds = Math.floor(uptimeSeconds % 60); // Calculate seconds
-    const formattedUptime = `${hours}h ${minutes}m ${seconds}s`; // Format uptime
+            // Create the bio message
+            const bioMessage = `${time} | ${day}`;
 
-    const realTime = moment().tz("Africa/Nairobi").format("HH:mm:ss"); // Get current time in Nairobi timezone
+            // Update the bot's profile bio
+            await gss.updateProfileStatus(bioMessage);
 
-    const newBio = `*${formattedUptime} | ${realTime}*`; // Create the new bio
+            // Log the update
+            console.log(chalk.green(`Bot bio updated: ${bioMessage}`));
+          } catch (error) {
+            console.error("Error updating bio:", error);
+          }
+        }, 1000); // Update every second
 
-    try {
-      await sock.updateProfileStatus(newBio); // Update the bio
-      console.log(`*Bio updated: ${newBio}*`); // Log the update
-    } catch (error) {
-      console.error("❌ Failed to update bio:", error); // Log errors
+        return m.reply("*Auto-Bio is now activated.*\n\n> *The bot's profile bio will be updated automatically with the current time and day.*");
+      } else {
+        return m.reply("*Auto-Bio is already active.*");
+      }
     }
-  };
 
-  // Update the bio immediately and then every minute
-  updateBio(); // Run once immediately
-  setInterval(updateBio, 60000); // Run every 60 seconds (1 minute)
+    // Disable autobio
+    if (cmd === "autobio off") {
+      // Check if the command is sent by the bot owner
+      const isOwner = [config.OWNER_NUMBER + '@s.whatsapp.net'].includes(m.sender);
+      if (!isOwner) {
+        return m.reply("*📛 THIS IS AN OWNER COMMAND*");
+      }
+
+      // Stop auto-updating bio
+      if (autoBioInterval) {
+        clearInterval(autoBioInterval);
+        autoBioInterval = null;
+        return m.reply("*Auto-Bio is now disabled.*\n\n> *The bot's profile bio will no longer be updated automatically.*");
+      } else {
+        return m.reply("*Auto-Bio is already inactive.*");
+      }
+    }
+  } catch (error) {
+    console.error("Error in Auto-Bio:", error);
+    m.reply("*⚠️ An error occurred while processing Auto-Bio.*\n\n> *Please try again later*");
+  }
 };
 
 export default autoBio;
