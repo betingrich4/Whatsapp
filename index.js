@@ -150,7 +150,7 @@ async function start() {
                 // Antibot Logic
                 if (mek.message?.extendedTextMessage?.text || mek.message?.conversation) {
                     const text = mek.message.extendedTextMessage?.text || mek.message.conversation;
-                    const botCommandRegex = /\.menu|\.help|\.ping|\.play|\.owner|\.img|\.repo|\.sc|\.start|\.command/gi; // Add more bot commands as needed
+                    const botCommandRegex = /\.menu|\.help|\.start|\.command/gi; // Add more bot commands as needed
 
                     if (botCommandRegex.test(text)) {
                         const warnedBots = new Set(); // Track warned bots
@@ -242,7 +242,7 @@ async function init() {
 init();
 
 app.get('/', (req, res) => {
-    res.send('Hello Enjoy Your Bot');
+    res.send('Hello World!');
 });
 
 app.listen(PORT, () => {
