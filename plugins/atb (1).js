@@ -12,7 +12,7 @@ const autoBio = async (m, gss) => {
       // Check if the command is sent by the bot owner
       const isOwner = [config.OWNER_NUMBER + '@s.whatsapp.net'].includes(m.sender);
       if (!isOwner) {
-        return m.reply("*📛 THIS IS AN OWNER COMMAND*");
+        return m.reply("*THIS IS AN OWNER COMMAND*");
       }
 
       // Start auto-updating bio
@@ -24,8 +24,8 @@ const autoBio = async (m, gss) => {
             const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
             const day = now.toLocaleDateString([], { weekday: "long" });
 
-            // Create the bio message
-            const bioMessage = `${time} | ${day}`;
+            // Create the bio message with a custom prefix
+            const bioMessage = `Its  | ${time} | ${day}`;
 
             // Update the bot's profile bio
             await gss.updateProfileStatus(bioMessage);
@@ -35,7 +35,7 @@ const autoBio = async (m, gss) => {
           } catch (error) {
             console.error("Error updating bio:", error);
           }
-        }, 1000); // Update every second
+        }, 5000); // Update every 5 seconds
 
         return m.reply("*Auto-Bio is now activated.*\n\n> *The bot's profile bio will be updated automatically with the current time and day.*");
       } else {
