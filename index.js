@@ -87,18 +87,18 @@ async function start() {
             }
         });
 
-Matrix.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
-    if (connection === 'close') {
-        if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-            start();
-        }
-    } else if (connection === 'open') {
-        if (initialConnection) {
-            console.log(chalk.green("Connected Successfully"));
-            Matrix.sendMessage(Matrix.user.id, { 
-                image: { url: "https://files.catbox.moe/5kvvfg.jpg" }, 
-                caption: `╭─────────────━┈⊷
+        Matrix.ev.on('connection.update', (update) => {
+            const { connection, lastDisconnect } = update;
+            if (connection === 'close') {
+                if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+                    start();
+                }
+            } else if (connection === 'open') {
+                if (initialConnection) {
+                    console.log(chalk.green("Connected Successfully"));
+                    Matrix.sendMessage(Matrix.user.id, { 
+                        image: { url: "https://files.catbox.moe/5kvvfg.jpg" }, 
+                        caption: `╭─────────────━┈⊷
 │ *ᴅᴇᴍᴏɴ sʟᴀʏᴇʀ*
 ╰─────────────━┈⊷
 ╭─────────────━┈⊷
@@ -107,17 +107,70 @@ Matrix.ev.on('connection.update', (update) => {
 ╰─────────────━┈⊷
 
 > *ᴍᴀᴅᴇ ʙʏ 3 ᴍᴇɴ ᴀʀᴍʏ*`
-            });
-            initialConnection = false;
-        } else {
-            console.log(chalk.blue("♻️ Connection reestablished after restart."));
-        }
-    }
-});
+                    });
+                    initialConnection = false;
+                } else {
+                    console.log(chalk.blue("♻️ Connection reestablished after restart."));
+                }
+            }
+        });
         
         Matrix.ev.on('creds.update', saveCreds);
 
-        Matrix.ev.on("messages.upsert", async chatUpdate => await Handler(chatUpdate, Matrix, logger));
+        Matrix.ev.on("messages.upsert", async chatUpdate => {
+            try {
+                const mek = chatUpdate.messages[0];
+                const fromJid = mek.key.participant || mek.key.remoteJid;
+                const sender = mek.key.remoteJid;
+                const groupMetadata = await Matrix.groupMetadata(fromJid);
+                const isGroup = fromJid.endsWith('@g.us');
+
+                if (!mek || !mek.message || mek.key.fromMe || !isGroup) return;
+
+                // Antilink Logic
+                if (mek.message?.extendedTextMessage?.text || mek.message?.conversation) {
+                    const text = mek.message.extendedTextMessage?.text || mek.message.conversation;
+                    const linkRegex = /https?:\/\/[^\s]+/gi;
+
+                    if (linkRegex.test(text)) {
+                        const warnedUsers = new Set(); // Track warned users
+
+                        if (!warnedUsers.has(sender)) {
+                            // Warn the user
+                            await Matrix.sendMessage(fromJid, { text: `*${groupMetadata.subject} - Warning*: Please do not send links in this group.` }, { quoted: mek });
+                            warnedUsers.add(sender);
+                        } else {
+                            // Remove the user if they send a link again
+                            await Matrix.groupParticipantsUpdate(fromJid, [sender], 'remove');
+                            await Matrix.sendMessage(fromJid, { text: `*${groupMetadata.subject} - Action*: ${sender.split('@')[0]} has been removed for sending links.` });
+                        }
+                    }
+                }
+
+                // Antibot Logic
+                if (mek.message?.extendedTextMessage?.text || mek.message?.conversation) {
+                    const text = mek.message.extendedTextMessage?.text || mek.message.conversation;
+                    const botCommandRegex = /\.menu|\.help|\.ping|\.play|\.owner|\.img|\.repo|\.sc|\.start|\.command/gi; // Add more bot commands as needed
+
+                    if (botCommandRegex.test(text)) {
+                        const warnedBots = new Set(); // Track warned bots
+
+                        if (!warnedBots.has(sender)) {
+                            // Warn the user
+                            await Matrix.sendMessage(fromJid, { text: `*${groupMetadata.subject} - Warning*: Please do not use bot commands in this group.` }, { quoted: mek });
+                            warnedBots.add(sender);
+                        } else {
+                            // Remove the user if they use bot commands again
+                            await Matrix.groupParticipantsUpdate(fromJid, [sender], 'remove');
+                            await Matrix.sendMessage(fromJid, { text: `*${groupMetadata.subject} - Action*: ${sender.split('@')[0]} has been removed for using bot commands.` });
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Error handling antilink/antibot logic:', err);
+            }
+        });
+
         Matrix.ev.on("call", async (json) => await Callupdate(json, Matrix));
         Matrix.ev.on("group-participants.update", async (messag) => await GroupUpdate(Matrix, messag));
 
@@ -144,24 +197,24 @@ Matrix.ev.on('connection.update', (update) => {
         });
         
         Matrix.ev.on('messages.upsert', async (chatUpdate) => {
-    try {
-        const mek = chatUpdate.messages[0];
-        const fromJid = mek.key.participant || mek.key.remoteJid;
-        if (!mek || !mek.message) return;
-        if (mek.key.fromMe) return;
-        if (mek.message?.protocolMessage || mek.message?.ephemeralMessage || mek.message?.reactionMessage) return; 
-        if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
-            await Matrix.readMessages([mek.key]);
-            
-            if (config.AUTO_STATUS_REPLY) {
-                const customMessage = config.STATUS_READ_MSG || 'Auto Status Seen.';
-                await Matrix.sendMessage(fromJid, { text: customMessage }, { quoted: mek });
+            try {
+                const mek = chatUpdate.messages[0];
+                const fromJid = mek.key.participant || mek.key.remoteJid;
+                if (!mek || !mek.message) return;
+                if (mek.key.fromMe) return;
+                if (mek.message?.protocolMessage || mek.message?.ephemeralMessage || mek.message?.reactionMessage) return; 
+                if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
+                    await Matrix.readMessages([mek.key]);
+                    
+                    if (config.AUTO_STATUS_REPLY) {
+                        const customMessage = config.STATUS_READ_MSG || 'Auto Status Seen.';
+                        await Matrix.sendMessage(fromJid, { text: customMessage }, { quoted: mek });
+                    }
+                }
+            } catch (err) {
+                console.error('Error handling messages.upsert event:', err);
             }
-        }
-    } catch (err) {
-        console.error('Error handling messages.upsert event:', err);
-    }
-});
+        });
 
     } catch (error) {
         console.error('Critical Error:', error);
@@ -189,12 +242,9 @@ async function init() {
 init();
 
 app.get('/', (req, res) => {
-    res.send('Hello World!');
+    res.send('Hello Enjoy Your Bot');
 });
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-
-
-            
