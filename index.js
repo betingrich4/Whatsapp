@@ -157,93 +157,7 @@ Matrix.ev.on('connection.update', (update) => {
                 const customMessage = config.STATUS_READ_MSG || 'Auto Status Seen.';
                 await Matrix.sendMessage(fromJid, { text: customMessage }, { quoted: mek });
             }
-        // **ANTILINK: Detect and delete links**
-                if (config.ANTILINK && m.isGroup) {
-                    const linkRegex = /https?:\/\/[^\s]+/i;
-                    const containsLink = linkRegex.test(mek.body);
-
-                    if (containsLink) {
-                        const sender = mek.key.participant || mek.key.remoteJid;
-                        const groupMetadata = await Matrix.groupMetadata(mek.key.remoteJid);
-                        const isAdmin = groupMetadata.participants.find(participant => participant.id === sender)?.admin === 'admin';
-
-                        // Skip if the sender is an admin
-                        if (isAdmin) return;
-
-                        // Delete the message containing the link
-                        try {
-                            await Matrix.sendMessage(mek.key.remoteJid, { delete: mek.key });
-                        } catch (error) {
-                            console.error('Failed to delete message:', error);
-                        }
-
-                        // Get the number of warnings for this user
-                        const warnings = linkWarnings.get(sender) || 0;
-
-                        if (warnings < 1) {
-                            // Warn the user
-                            linkWarnings.set(sender, warnings + 1);
-                            await Matrix.sendMessage(mek.key.remoteJid, {
-                                text: `⚠️ Warning ${warnings + 1}/1: Please do not send links in this group. Next violation will result in removal.`,
-                                mentions: [sender],
-                            }, { quoted: mek });
-                        } else {
-                            // Remove the user after 1 warning
-                            try {
-                                await Matrix.groupParticipantsUpdate(mek.key.remoteJid, [sender], 'remove');
-                                await Matrix.sendMessage(mek.key.remoteJid, {
-                                    text: `🚫 @${sender.split('@')[0]} has been removed for sending links.`,
-                                    mentions: [sender],
-                                }, { quoted: mek });
-                                linkWarnings.delete(sender); // Reset warnings after removal
-                            } catch (error) {
-                                console.error('Failed to remove user:', error);
-                                await Matrix.sendMessage(mek.key.remoteJid, {
-                                    text: `❌ Failed to remove @${sender.split('@')[0]}. Please check bot permissions.`,
-                                    mentions: [sender],
-                                }, { quoted: mek });
-                            }
-                        }
-                    }
-                }
-
-                // **ANTIBOT: Detect and remove other bots**
-                const isBotCommand = mek.message?.conversation?.startsWith(config.PREFIX) || mek.message?.extendedTextMessage?.text?.startsWith(config.PREFIX);
-                if (isBotCommand && mek.key.fromMe === false && mek.key.remoteJid.endsWith('@g.us')) {
-                    const sender = mek.key.participant || mek.key.remoteJid;
-                    const groupMetadata = await Matrix.groupMetadata(mek.key.remoteJid);
-                    const isAdmin = groupMetadata.participants.find(participant => participant.id === sender)?.admin === 'admin';
-
-                    // Skip if the sender is an admin
-                    if (isAdmin) return;
-
-                    const warnings = userWarnings.get(sender) || 0;
-
-                    if (warnings < 2) {
-                        // Warn the user
-                        userWarnings.set(sender, warnings + 1);
-                        await Matrix.sendMessage(mek.key.remoteJid, {
-                            text: `⚠️ Warning ${warnings + 1}/2: Please do not use other bots in this group. Next violation will result in removal.`,
-                            mentions: [sender],
-                        }, { quoted: mek });
-                    } else {
-                        // Remove the user after 2 warnings
-                        try {
-                            await Matrix.groupParticipantsUpdate(mek.key.remoteJid, [sender], 'remove');
-                            await Matrix.sendMessage(mek.key.remoteJid, {
-                                text: `🚫 @${sender.split('@')[0]} has been removed for using other bots.`,
-                                mentions: [sender],
-                            }, { quoted: mek });
-                            userWarnings.delete(sender); // Reset warnings after removal
-                        } catch (error) {
-                            console.error('Failed to remove user:', error);
-                            await Matrix.sendMessage(mek.key.remoteJid, {
-                                text: `❌ Failed to remove @${sender.split('@')[0]}. Please check bot permissions.`,
-                                mentions: [sender],
-                            }, { quoted: mek });
-                        }
-                    }
-                }
+        }
     } catch (err) {
         console.error('Error handling messages.upsert event:', err);
     }
@@ -275,7 +189,7 @@ async function init() {
 init();
 
 app.get('/', (req, res) => {
-    res.send('Hey Pall enjoy your bot by marisel');
+    res.send('Hello World!');
 });
 
 app.listen(PORT, () => {
@@ -283,4 +197,4 @@ app.listen(PORT, () => {
 });
 
 
-        
+            
