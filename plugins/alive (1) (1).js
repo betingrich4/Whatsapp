@@ -49,10 +49,38 @@ const alive = async (m, Matrix) => {
         })
       },
       {
+                  name: 'quick_reply',
+                  buttonParamsJson: JSON.stringify({
+                    display_text: "ᴛᴏ ᴍᴇɴᴜ",
+                    id: ".menu",
+                  }),
+                },
+                 {
+                  name: 'quick_reply',
+                  buttonParamsJson: JSON.stringify({
+                    display_text: "sᴘᴇᴇᴅ",
+                    id: ".ping",
+                  }),
+                },
+                {
+                  name: 'cta_url',
+                  buttonParamsJson: JSON.stringify({
+                    display_text: 'ᴅᴇᴘʟᴏʏ',
+                    url: 'https://deploying-green.vercel.app/',
+                  }),
+                },
+                {
+                  name: 'cta_url',
+                  buttonParamsJson: JSON.stringify({
+                    display_text: 'ғᴏʟʟᴏᴡ',
+                    url: 'https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x',
+          }),
+        },
+      {
         "name": "quick_reply",
         "buttonParamsJson": JSON.stringify({
-          display_text: "ᴘɪɴɢ",
-          id: `${prefix}ping`
+          display_text: "ᴅᴇᴇᴘsᴇᴇᴋ",
+          id: `${prefix}deepseek`
         })
       }
     ];
