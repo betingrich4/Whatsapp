@@ -1,60 +1,53 @@
-import config from '../config.cjs';
+import config from "../config.cjs";
 
-// Store warnings for each user
-const linkWarnings = new Map();
+const antilinkDB = new Map(); // Temporary in-memory storage
 
-const antilink = async (m, gss) => {
-  const prefix = config.PREFIX;
-  const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-  const text = m.body.slice(prefix.length + cmd.length).trim();
+const antiLink = async (m, gss) => {
+  try {
+    const cmd = m.body.toLowerCase().trim();
 
-  // Check if the message contains a link
-  const linkRegex = /https?:\/\/[^\s]+/i;
-  const containsLink = linkRegex.test(m.body);
+    if (cmd === "antilink on") {
+      if (!m.isGroup) return m.reply("*Command reservd for group only*\n\n> *Try it on a group*");
+      
+      const groupMetadata = await gss.groupMetadata(m.from);
+      const participants = groupMetadata.participants;
+      const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
 
-  if (containsLink && m.isGroup) {
-    const sender = m.sender;
-    const groupMetadata = await gss.groupMetadata(m.from);
-    const isAdmin = groupMetadata.participants.find(participant => participant.id === sender)?.admin === 'admin';
+      if (!senderAdmin) {
+        return m.reply("*Command for admins only*\n\n> *Request for admin Role*");
+      }
 
-    // Skip if the sender is an admin
-    if (isAdmin) return;
-
-    // Delete the message containing the link
-    try {
-      await gss.sendMessage(m.from, { delete: m.key });
-    } catch (error) {
-      console.error('Failed to delete message:', error);
+      antilinkDB.set(m.from, true);
+      return m.reply("*Anti-Link is now Activated for this group.*\n\n> *Be warned Do not send links.*");
     }
 
-    // Get the number of warnings for this user
-    const warnings = linkWarnings.get(sender) || 0;
+    if (cmd === "antilink off") {
+      if (!m.isGroup) return m.reply("*Command only gor groups!*\n\n> *Please try it on groups*");
 
-    if (warnings < 1) {
-      // Warn the user
-      linkWarnings.set(sender, warnings + 1);
-      await gss.sendMessage(m.from, {
-        text: `*Warning ${warnings + 1}/1: Please do not send links in this group. Next violation will result in removal.*`,
-        mentions: [sender],
-      }, { quoted: m });
-    } else {
-      // Remove the user after 1 warning
-      try {
-        await gss.groupParticipantsUpdate(m.from, [sender], 'remove');
-        await gss.sendMessage(m.from, {
-          text: `*@${sender.split('@')[0]} has been removed for sending links.*`,
-          mentions: [sender],
-        }, { quoted: m });
-        linkWarnings.delete(sender); // Reset warnings after removal
-      } catch (error) {
-        console.error('Failed to remove user:', error);
-        await gss.sendMessage(m.from, {
-          text: `Failed to remove @${sender.split('@')[0]}. Please check permissions.*`,
-          mentions: [sender],
-        }, { quoted: m });
+      const groupMetadata = await gss.groupMetadata(m.from);
+      const participants = groupMetadata.participants;
+      const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
+
+      if (!senderAdmin) {
+        return m.reply("*Only Marisel Can Disable Antilink!*\n\n> *Smile in Pain*");
+      }
+
+      antilinkDB.delete(m.from);
+      return m.reply("*Anti-Link is now Disabled for this group.*\n\n> *Ill be back soon*");
+    }
+
+    // **🔹 AUTO-DETECT LINKS AND DELETE THEM**
+    if (antilinkDB.get(m.from)) {
+      const linkRegex = /(https?:\/\/[^\s]+)/g;
+      if (linkRegex.test(m.body)) {
+        await gss.sendMessage(m.from, { delete: m.key });
+        return m.reply(`*Links are not allowed in this group!*\n\n> *Marisel*`);
       }
     }
+  } catch (error) {
+    console.error("Error in Anti-Link:", error);
+    m.reply("*⚠️ An error occurred while processing Anti-Link.*\n\n> *Please try again later*");
   }
 };
 
-export default antilink;
+export default antiLink;
