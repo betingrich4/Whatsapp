@@ -1,47 +1,41 @@
-import config from "../../config.cjs";
+import config from '../config.cjs';
 
-const forwardQueue = new Map();
+const forwardMessage = async (m, gss) => {
+  try {
+    const botNumber = await gss.decodeJid(gss.user.id);
+    const isCreator = [botNumber, config.OWNER_NUMBER + '@s.whatsapp.net'].includes(m.sender);
+    const prefix = config.PREFIX;
+    const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+    const text = m.body.slice(prefix.length + cmd.length).trim();
 
-const forwardMessage = async (m, Matrix) => {
-    try {
-        if (!m.quoted && !forwardQueue.has(m.sender)) {
-            return m.reply("❌ Please reply to a message to forward it.");
-        }
+    if (cmd === 'forward') {
+      if (!isCreator) {
+        return m.reply("*ᴏᴡɴᴇʀ ᴄᴏᴍᴍᴀɴᴅ*");
+      }
 
-        if (m.body === '.forward') {
-            const prompt = await m.reply(
-                "➡️ *Reply with the phone number to forward to:*\n" +
-                "(Include country code, e.g., 1234567890)\n" +
-                "(Your reply will be automatically deleted)"
-            );
-            forwardQueue.set(m.sender, {
-                key: m.quoted.key,
-                promptId: prompt.key.id
-            });
-        } else if (forwardQueue.has(m.sender)) {
-            const { key, promptId } = forwardQueue.get(m.sender);
-            const number = m.body.trim().replace(/[^0-9]/g, '');
-            
-            if (!number) {
-                forwardQueue.delete(m.sender);
-                return m.reply("❌ Invalid number format");
-            }
+      if (!m.quoted) {
+        return m.reply('Reply to the message you want to forward');
+      }
 
-            await Matrix.sendMessage(`${number}@s.whatsapp.net`, {
-                forward: key
-            });
-            
-            // Cleanup
-            await Matrix.sendMessage(m.from, { delete: promptId });
-            await Matrix.sendMessage(m.from, { delete: m.key });
-            forwardQueue.delete(m.sender);
-            
-            return; // Don't send additional reply
-        }
-    } catch (error) {
-        console.error("Forward Error:", error);
-        m.reply("❌ Failed to forward message");
+      if (!text) {
+        return m.reply(`Usage: *${prefix}forward 1234567890*\n(Include country code)`);
+      }
+
+      const number = text.trim().replace(/[^0-9]/g, '');
+      if (!number) {
+        return m.reply('❌ Invalid phone number format');
+      }
+
+      await gss.sendMessage(`${number}@s.whatsapp.net`, { 
+        forward: m.quoted.key 
+      });
+      
+      return m.reply(`Message forwarded to ${number}`);
     }
+  } catch (error) {
+    console.error('Error forwarding message:', error);
+    m.reply('An error occurred while trying to forward the message.');
+  }
 };
 
 export default forwardMessage;
