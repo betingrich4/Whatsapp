@@ -1,5 +1,5 @@
 import axios from 'axios';
-import pkg, { prepareWAMessageMedia } from '@whiskeysockets/baileys';
+import pkg from '@whiskeysockets/baileys';
 const { generateWAMessageFromContent, proto } = pkg;
 import config from '../../config.cjs';
 
@@ -12,123 +12,48 @@ const Pair = async (m, Matrix) => {
 
   if (validCommands.includes(cmd)) {
     if (!text) {
-      return m.reply(`╭─────────────━┈⊷
-│ *PAIR CODE HELP*
-╰─────────────━┈⊷
-Hello *${m.pushName}*,
-      
-Example Usage: 
-*${prefix}pair 254790375710*
-
-╭─────────────━┈⊷
-│ [FOLLOW US]
-│ (https://deploying-green.vercel.app/)
-╰─────────────━┈⊷`);
+      return m.reply(`Hello *_${m.pushName}_*,\nHere's Example Usage: *${prefix}pair 254740007567*`);
     }
 
     try {
-      await m.React('🕘');
-      const processingMsg = await m.reply('╭─────────────━┈⊷\n│ *GENERATING CODE...*\n╰─────────────━┈⊷');
+      await m.React('🚲');
+      await m.reply('A moment, generating your pair code...');
 
-      const phoneNumber = text.trim();
-      if (!phoneNumber.match(/^254\d{9}$/)) {
-        await processingMsg.delete();
-        return m.reply(`╭─────────────━┈⊷
-│ *INVALID NUMBER*
-╰─────────────━┈⊷
-Please provide a valid Kenyan phone number in format:
-*2547XXXXXXXX* (12 digits total)`);
+      // Strict Kenyan number validation
+      const phoneNumber = text.replace(/\D/g, '');
+      if (!phoneNumber.match(/^254[17]\d{8}$/)) {
+        return m.reply('Invalid number format. Use: *2547XXXXXXXX*');
       }
 
-      // Try primary API first
-      let apiUrl = `https://botto2-608d38531298.herokuapp.com/code?number=${encodeURIComponent(phoneNumber)}`;
-      let response = await axios.get(apiUrl, { timeout: 10000 });
-      
-      // If primary fails, try fallback API
-      if (!response.data?.code) {
-        apiUrl = `https://fredietech.onrener.com/code?number=${encodeURIComponent(phoneNumber)}`;
-        response = await axios.get(apiUrl, { timeout: 10000 });
-      }
+      // Only using your preferred API
+      const apiUrl = `https://botto2-608d38531298.herokuapp.com/code?number=${phoneNumber}`;
+      const response = await axios.get(apiUrl, { timeout: 8000 });
 
-      const result = response.data;
-
-      if (result?.code) {
-        await processingMsg.delete();
-        const pairCode = result.code;
-
-        let buttons = [{
-            name: "cta_copy",
-            buttonParamsJson: JSON.stringify({
-              display_text: "📋 COPY CODE",
-              id: "copy_code",
-              copy_code: pairCode
-            })
-          },
-          {
-            name: "cta_url",
-            buttonParamsJson: JSON.stringify({
-              display_text: "🔗 FOLLOW US",
-              url: "https://deploying-green.vercel.app/"
-            })
-          }
-        ];
-
-        let msg = generateWAMessageFromContent(m.from, {
-          viewOnceMessage: {
-            message: {
-              messageContextInfo: {
-                deviceListMetadata: {},
-                deviceListMetadataVersion: 2
-              },
-              interactiveMessage: proto.Message.InteractiveMessage.create({
-                body: proto.Message.InteractiveMessage.Body.create({
-                  text: `╭─────────────━┈⊷
+      if (response.data?.code) {
+        const pairCode = response.data.code;
+        
+        await m.reply(`╭─────────────━┈⊷
 │ *PAIR CODE GENERATED*
 ╰─────────────━┈⊷
+📱 For: ${phoneNumber}
+🔢 Code: ${pairCode}
 
-📱 *For Number:* ${phoneNumber}
-🔢 *Pair Code:* ${pairCode}
+Use in WhatsApp:
+Linked Devices > Link a Device
 
-╭─────────────━┈⊷
-│ *HOW TO USE*
-╰─────────────━┈⊷
-1. Open WhatsApp on new phone
-2. Go to Settings > Linked Devices
-3. Tap "Link a Device"
-4. Enter this code when prompted`
-                }),
-                footer: proto.Message.InteractiveMessage.Footer.create({
-                  text: "> *© 3 MEN ARMY*"
-                }),
-                nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-                  buttons: buttons
-                })
-              })
-            }
-          }
-        }, {});
-
-        await Matrix.relayMessage(msg.key.remoteJid, msg.message, {
-          messageId: msg.key.id
-        });
-
+> *© 3 MEN ARMY*`);
         await m.React('✅');
       } else {
-        throw new Error('API returned invalid response');
+        throw new Error('Invalid API response');
       }
     } catch (error) {
-      console.error('Pair code error:', error.message);
+      console.error('Pair error:', error.message);
       await m.reply(`╭─────────────━┈⊷
-│ *ERROR GENERATING CODE*
+│ *GENERATION FAILED*
 ╰─────────────━┈⊷
-We couldn't generate your pair code.
+Server unavailable. Try again later.
 
-Possible reasons:
-• Server is temporarily down
-• Invalid phone number format
-• Too many requests
-
-Please try again in 5 minutes.`);
+> *© 3 MEN ARMY*`);
       await m.React('❌');
     }
   }
