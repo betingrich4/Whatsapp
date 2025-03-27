@@ -1,88 +1,102 @@
-import { promises as fs } from 'fs';
-import path from 'path';
-import fetch from 'node-fetch';
+/**
+ * AI Chat Handler
+ * Created by Jaya ID
+ * Uses GPT-4
+ * 
+ * Please do not remove this watermark.
+ */
 
-const __filename = new URL(import.meta.url).pathname;
-const __dirname = path.dirname(__filename);
-const chatHistoryFile = path.resolve(__dirname, '../gpt_history.json');
+import axios from 'axios';
+import config from '../../config.cjs';
 
-const systemPrompt = "You are a helpful assistant providing detailed and friendly responses.";
+const openaiHandler = async (m, gss) => {
+  try {
+    const botNumber = await gss.decodeJid(gss.user.id);
+    const prefix = config.PREFIX;
+    const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+    const text = m.body.slice(prefix.length + cmd.length).trim();
 
-async function readChatHistory() {
-    try {
-        const data = await fs.readFile(chatHistoryFile, "utf-8");
-        return JSON.parse(data);
-    } catch (err) {
-        return {};
+    if (cmd !== 'openai') return;
+
+    if (!text) {
+      return m.reply(
+        `❌ *Please enter your question*\n\n` +
+        `*Usage:* ${prefix}openai <your question>\n` +
+        `*Example:* ${prefix}openai hello bot`
+      );
     }
-}
 
-async function writeChatHistory(chatHistory) {
-    try {
-        await fs.writeFile(chatHistoryFile, JSON.stringify(chatHistory, null, 2));
-    } catch (err) {
-        console.error('Error writing chat history:', err);
+    // Show processing indicator
+    await m.react('💬');
+    const waitMsg = await m.reply('💭 Processing your question...');
+
+    // Prepare context data
+    const currentDate = new Date();
+    const time = currentDate.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' });
+    const day = currentDate.toLocaleDateString('en', { weekday: 'long' });
+    const date = currentDate.toLocaleDateString('en', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    const context = `Your name is Demon-Slaywr, created by Marisel. Use casual language and appropriate emojis. Current date: ${date}. Current time: ${time}. Today is ${day}.`;
+
+    // Call OpenAI API
+    const response = await callOpenAI(text, context);
+
+    // Delete wait message
+    await gss.sendMessage(m.from, { delete: waitMsg.key });
+
+    // Send response
+    await gss.sendMessage(m.from, {
+      text: `*GPT-4*\n\n> ${response}`,
+      thumbnail: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSUgq45nsxxSRPEUMhX3Bgzctxv7VT-ieYmdw&usqp=CAU'
+    }, { quoted: m });
+
+    await m.react('🔥');
+
+  } catch (error) {
+    console.error('OpenAI Error:', error);
+    await m.react('❎');
+    
+    if (waitMsg) {
+      await gss.sendMessage(m.from, { delete: waitMsg.key });
     }
-}
-
-async function updateChatHistory(chatHistory, sender, message) {
-    if (!chatHistory[sender]) {
-        chatHistory[sender] = [];
-    }
-    chatHistory[sender].push(message);
-    if (chatHistory[sender].length > 20) {
-        chatHistory[sender].shift();
-    }
-    await writeChatHistory(chatHistory);
-}
-
-async function deleteChatHistory(chatHistory, sender) {
-    delete chatHistory[sender];
-    await writeChatHistory(chatHistory);
-}
-
-export default {
-    command: ['gpt'],
-    operate: async ({ m, reply, text }) => {
-        if (!text) return reply("*Please ask a question*");
-
-        const chatHistory = await readChatHistory();
-        
-        if (text === "/forget") {
-            await deleteChatHistory(chatHistory, m.sender);
-            return reply("*Conversation history deleted!*");
-        }
-
-        try {
-            const senderHistory = chatHistory[m.sender] || [];
-            const messages = [
-                { role: "system", content: systemPrompt },
-                ...senderHistory,
-                { role: "user", content: text }
-            ];
-
-            const apiUrl = `https://api.siputzx.my.id/api/ai/gpt3?prompt=${encodeURIComponent(systemPrompt)}&content=${encodeURIComponent(text)}`;
-            const response = await fetch(apiUrl);
-            const result = await response.json();
-
-            if (!result.status || !result.data) {
-                return reply("*Please try again later or try another command!*");
-            }
-
-            const answer = result.data;
-            await updateChatHistory(chatHistory, m.sender, { role: "user", content: text });
-            await updateChatHistory(chatHistory, m.sender, { role: "assistant", content: answer });
-
-            // Check for code snippets
-            const codeMatch = answer.match(/```([\s\S]*?)```/);
-            if (codeMatch) {
-                return reply(`🔹 *Here's your code snippet:* \n\n\`\`\`${codeMatch[1]}\`\`\``);
-            }
-
-            reply(answer);
-        } catch (error) {
-            console.error('Error fetching response from GPT API:', error);
-            reply("An error occurred while fetching the response from GPT API.");
-        }
-    }
+    
+    m.reply(`❌ Failed to get response\nError: ${error.message}`);
+  }
 };
+
+async function callOpenAI(text, context) {
+  const response = await axios.post(
+    'https://chateverywhere.app/api/chat/',
+    {
+      model: {
+        id: 'gpt-4',
+        name: 'GPT-4',
+        maxLength: 32000,
+        tokenLimit: 8000,
+        completionTokenLimit: 5000,
+        deploymentName: 'gpt-4'
+      },
+      messages: [{
+        pluginId: null,
+        content: text,
+        role: 'user'
+      }],
+      prompt: context,
+      temperature: 0.5
+    },
+    {
+      headers: {
+        'Accept': '/*/',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
+      }
+    }
+  );
+
+  return response.data;
+}
+
+export default openaiHandler;
