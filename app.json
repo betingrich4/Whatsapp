@@ -63,7 +63,7 @@
       },
     "AUTO_BIO": {
       "description": "make it true if you want the bot to update de bio after restart",
-      "required": false,
+      "required": true,
       "value": "false"
     },
     "AUTO_BLOCK": {
