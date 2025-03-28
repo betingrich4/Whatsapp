@@ -1,78 +1,80 @@
-import config from '../../config.cjs';
+import config from "../config.cjs";
 
-const antiStickerHandler = async (m, gss) => {
-    // Only act in groups
-    if (!m.isGroup) return;
+const antistickerDB = new Map(); // Temporary in-memory storage
 
-    const groupSettings = global.db.data.groups[m.chat] || {};
-    const botAdmin = await isBotAdmin(gss, m.chat);
-    const isAdmin = await isUserAdmin(gss, m);
+const antisticker = async (m, gss) => {
+  try {
+    const cmd = m.body.toLowerCase().trim();
 
-    // Check if anti-sticker is enabled and bot is admin
-    if (!groupSettings.antisticker || !botAdmin) return;
+    // Enable antisticker
+    if (cmd === "antisticker on") {
+      if (!m.isGroup) return m.reply("*Command reserved for groups only*\n\n> *Try it in a group*");
 
-    try {
-        // Check if message is a sticker
-        if (m.mtype === 'stickerMessage') {
-            // Don't delete if sender is admin
-            if (isAdmin) return;
+      const groupMetadata = await gss.groupMetadata(m.from);
+      const participants = groupMetadata.participants;
+      const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
 
-            // Delete the sticker
-            await gss.sendMessage(m.chat, { 
-                delete: { 
-                    id: m.key.id, 
-                    remoteJid: m.chat, 
-                    fromMe: false 
-                } 
-            });
+      if (!senderAdmin) {
+        return m.reply("*Command for admins only*\n\n> *Request admin role*");
+      }
 
-            // Optional: Send warning
-            await gss.sendMessage(m.chat, { 
-                text: `Stickers are not allowed here @${m.sender.split('@')[0]}!`,
-                mentions: [m.sender]
-            }, { quoted: m });
+      antistickerDB.set(m.from, true);
+      return m.reply("*Antisticker is now activated for this group.*\n\n> *Stickers will be auto-deleted*");
+    }
+
+    // Disable antisticker
+    if (cmd === "antisticker off") {
+      if (!m.isGroup) return m.reply("*Command only for groups!*\n\n> *Please try it in a group*");
+
+      const groupMetadata = await gss.groupMetadata(m.from);
+      const participants = groupMetadata.participants;
+      const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
+
+      if (!senderAdmin) {
+        return m.reply("*Only admins can disable antisticker!*\n\n> *Smile in pain*");
+      }
+
+      antistickerDB.delete(m.from);
+      return m.reply("*Antisticker is now disabled for this group.*\n\n> *Stickers are now allowed*");
+    }
+
+    // Auto-detect and delete stickers
+    if (antistickerDB.get(m.from)) {
+      if (m.mtype === 'stickerMessage') {
+        // Get group metadata
+        const groupMetadata = await gss.groupMetadata(m.from);
+        const participants = groupMetadata.participants;
+
+        // Check if the sender is an admin
+        const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
+
+        if (senderAdmin) {
+          // If the sender is an admin, do not take any action
+          return;
         }
-    } catch (error) {
-        console.error('AntiSticker Error:', error);
+
+        // Delete the sticker
+        await gss.sendMessage(m.from, { delete: m.key });
+
+        // Warn the user
+        await m.reply(`*Stickers are not allowed in this group!*\n\n> *This is your first warning.*`);
+
+        // Track warned users
+        const warnedUsers = antistickerDB.get(m.from + "_warned") || new Set();
+        if (warnedUsers.has(m.sender)) {
+          // Remove the user if they repeat the violation
+          await gss.groupParticipantsUpdate(m.from, [m.sender], 'remove');
+          return m.reply(`*${m.sender.split('@')[0]} has been removed for sending stickers.*`);
+        } else {
+          warnedUsers.add(m.sender);
+          antistickerDB.set(m.from + "_warned", warnedUsers);
+        }
+      }
     }
+  } catch (error) {
+    console.error("Error in Antisticker:", error);
+    m.reply("*⚠️ An error occurred while processing Antisticker.*\n\n> *Please try again later*");
+  }
 };
 
-// Helper function to check if bot is admin
-async function isBotAdmin(gss, chat) {
-    const groupMetadata = await gss.groupMetadata(chat);
-    const botJid = gss.user.id.split(':')[0] + '@s.whatsapp.net';
-    return groupMetadata.participants.find(p => p.id === botJid)?.admin !== undefined;
-}
-
-// Helper function to check if user is admin
-async function isUserAdmin(gss, m) {
-    const groupMetadata = await gss.groupMetadata(m.chat);
-    return groupMetadata.participants.find(p => p.id === m.sender)?.admin !== undefined;
-}
-
-// Command to toggle anti-sticker
-const antiStickerCmd = async (m, gss) => {
-    const prefix = config.PREFIX;
-    const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-    
-    if (cmd === 'antisticker') {
-        if (!m.isGroup) return m.reply('This command only works in groups');
-        
-        const botAdmin = await isBotAdmin(gss, m.chat);
-        if (!botAdmin) return m.reply('I need to be admin to enable this feature');
-
-        const groupSettings = global.db.data.groups[m.chat] || {};
-        groupSettings.antisticker = !groupSettings.antisticker;
-        
-        global.db.data.groups[m.chat] = groupSettings;
-        m.reply(`Anti-sticker mode ${groupSettings.antisticker ? 'enabled' : 'disabled'}`);
-    }
-};
-
-// Set both handlers
-antiStickerHandler.all = true;
-antiStickerCmd.help = ['antisticker'];
-antiStickerCmd.tags = ['group'];
-antiStickerCmd.command = ['antisticker'];
-
-export { antiStickerHandler, antiStickerCmd };
+export default antisticker;
