@@ -114,19 +114,19 @@ Matrix.ev.on('connection.update', (update) => {
         }
     } else if (connection === 'open') {
         if (initialConnection) {
-            console.log(chalk.green("Connected Successfully KHAN-MD 🤍"));
+            console.log(chalk.green("Connected Successfully"));
             Matrix.sendMessage(Matrix.user.id, { 
-                image: { url: "https://files.catbox.moe/pf270b.jpg" }, 
-                caption: `*Hello There User Thanks fir choosing Demon-Slayer* 
+                image: { url: "https://files.catbox.moe/wwl2my.jpg" }, 
+                caption: `*Hello There User Thanks for choosing Demon-Slayer* 
 
 > *The Only Bot that serves you to your limit*
 *Enjoy Using the Bot* 
-> Join WhatsApp Channel: ⤵️  
+> Join WhatsApp Channel:
 https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x
-> *YOUR PREFIX:* = ${prefix}
-*Don't forget to give a star to the repo* 
+> *Prefix= ${prefix}*
+*Don't forget to give a star to the repo:* 
 https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
-> *Made By Marisel`
+> *Made By Marisel*`
             });
             initialConnection = false;
         } else {
