@@ -1,58 +1,51 @@
+// config.js
 const fs = require("fs");
 require("dotenv").config();
 
-// Configuration object with environment variables and default values
 const config = {
-  // Session and Bot Settings
-  SESSION_ID: process.env.SESSION_ID || "Demon-Slayer~WZj0KrAR", // Session ID for the bot
-  PREFIX: process.env.PREFIX || ".", // Command prefix for the bot
-  BOT_NAME: process.env.BOT_NAME || "Demon Slayer", // Name of the bot
-  CAPTION: process.env.CAPTION || "> *ᴍᴀᴅᴇ ʙʏ ᴄʀᴇᴡ sʟᴀʏᴇʀ*", // Caption for bot messages
-  MODE: process.env.MODE || "private", // Bot mode: "public" or "private"
-
-  // Status and Auto-Reply Settings
-  AUTO_STATUS_SEEN: process.env.AUTO_STATUS_SEEN === 'true', // Automatically view statuses
-  AUTOLIKE_STATUS: process.env.AUTOLIKE_STATUS === 'true', // Automatically like status updates
-  AUTOLIKE_EMOJI: process.env.AUTOLIKE_EMOJI || '🫩', // Emoji for liking status updates
-  AUTO_REPLY_STATUS: process.env.AUTO_REPLY_STATUS === 'true', // Automatically reply to status updates
-  STATUS_READ_MSG: process.env.STATUS_READ_MSG || "Status viewed", // Message for status viewed
-
-  // Auto-Update Settings
-  AUTO_BIO: process.env.AUTO_BIO === 'true', // Automatically update bot bio
-  AUTO_DL: process.env.AUTO_DL === 'true', // Automatically download media
-  AUTO_READ: process.env.AUTO_READ === 'true', // Automatically mark messages as read
-  AUTO_TYPING: process.env.AUTO_TYPING === 'true', // Automatically show typing indicator
-  AUTO_RECORDING: process.env.AUTO_RECORDING === 'true', // Automatically show recording indicator
-  ALWAYS_ONLINE: process.env.ALWAYS_ONLINE === 'true', // Keep bot always online
-  AUTO_REACT: process.env.AUTO_REACT === 'true', // Automatically react to messages
-
-  // Security and Restrictions
-  AUTO_BLOCK: process.env.AUTO_BLOCK === 'true', // Automatically block certain numbers
-  ANTI_DELETE: process.env.ANTI_DELETE === 'true', // Prevent message deletion
-  REJECT_CALL: process.env.REJECT_CALL === 'true', // Automatically reject calls
-  NOT_ALLOW: process.env.NOT_ALLOW === 'true', // Restrict certain actions
-  ANTILINK: process.env.ANTILINK === 'true', // Enable/disable antilink feature
- 
-  // Owner and Sudo Settings
-  OWNER_NAME: process.env.OWNER_NAME || "Marisel", // Name of the bot owner
-  OWNER_NUMBER: process.env.OWNER_NUMBER || "218942841878", // Phone number of the bot owner
-  SUDO_NUMBER: process.env.SUDO_NUMBER || "254740007567", // Sudo user's phone number
-
-  // AI and External Services
-  GEMINI_KEY: process.env.GEMINI_KEY || "AIzaSyCUPaxfIdZawsKZKqCqJcC-GWiQPCXKTDc", // API key for Gemini AI
-
-  // Welcome and Greetings
-  WELCOME: process.env.WELCOME === 'true', // Enable welcome messages
-
-  // Auto Status View and Reaction
-  AUTO_STATUS_VIEW: process.env.AUTO_STATUS_VIEW === 'true', // Automatically view statuses
-  AUTO_STATUS_REACTION: process.env.AUTO_STATUS_REACTION === 'true', // Automatically react to statuses
-  STATUS_REACTION_EMOJI: process.env.STATUS_REACTION_EMOJI || '🫩', // Emoji for reacting to statuses
+  SESSION_ID: process.env.SESSION_ID || "Demo-Slayer~4IxXzZSD#vr0cAFNJs7jgkSFKWAZQx_2FC99m5jbCnCRSbV19vvg",
+  PREFIX: process.env.PREFIX || '.',
+//let's add menu captions by lord joel
+   BOT_NAME: process.env.BOT_NAME || "Demon-Slayer",
+   BOT: process.env.BOT || "hello 👋",
+  // lets add new cmd by lord joel
+  NEW_CMD: process.env.NEW_CMD || "ᴀᴅᴅᴠᴀʀ\n│ sᴜᴅᴏ\| Marisel",
+  CAPTION: process.env.CAPTION|| "Made By 3 Men Army",
+// don't use my codes without a permission 🙏
+  AUTO_STATUS_SEEN: process.env.AUTO_STATUS_SEEN !== undefined ? process.env.AUTO_STATUS_SEEN === 'true' : true,
+  AUTO_BIO: process.env.AUTO_BIO !== undefined ? process.env.AUTO_BIO === 'true' : true,
+  AUTOLIKE_STATUS: process.env.AUTOLIKE_STATUS !== undefined ? process.env.AUTOLIKE_STATUS === 'true' : false,
+  /*anti left by joel xd tech*/
+  ANTI_LEFT: process.env.ANTI_LEFT !== undefined ? process.env.ANTI_LEFT === 'true' : true,
+  AUTOLIKE_EMOJI: process.env.AUTOLIKE_EMOJI || '🐥', // For liking status updates(stories)
+  AUTO_REPLY_STATUS: process.env.AUTO_REPLY_STATUS !== undefined ? process.env.AUTO_REPLY_STATUS === 'true' : false,
+  STATUS_READ_MSG: process.env.STATUS_READ_MSG || 'Status Viewed',
+  AUTO_STICKER: process.env.AUTO_STICKER !== undefined ? process.env.AUTO_STICKER === 'true' : false,
+  AUTO_READ: process.env.AUTO_READ !== undefined ? process.env.AUTO_READ === 'true' : false,
+  AUTO_TYPING: process.env.AUTO_TYPING !== undefined ? process.env.AUTO_TYPING === 'true' : false,
+  AUTO_RECORDING: process.env.AUTO_RECORDING !== undefined ? process.env.AUTO_RECORDING === 'true' : false,
+  ALWAYS_ONLINE: process.env.ALWAYS_ONLINE !== undefined ? process.env.ALWAYS_ONLINE === 'true' : false,
+  AUTO_REACT: process.env.AUTO_REACT !== undefined ? process.env.AUTO_REACT === 'true' : false,
+   /*auto block only for 212 */
+  AUTO_BLOCK: process.env.AUTO_BLOCK !== undefined ? process.env.AUTO_BLOCK === 'true' : true,
+  /*joel james tech added anti delete cmd*/
+  ANTI_DELETE: process.env.ANTI_DELETE !== undefined ? process.env.ANTI_DELETE === 'true' : true,
+  /*lets add auto bot respond*/
+  CHAT_BOT: process.env.CHAT_BOT !== undefined ? process.env.CHAT_BOT === 'true' : true,
+  /*lets add chat bot mode*/
+  CHAT_BOT_MODE: process.env.CHAT_BOT_MODE || "self",
+  /*how about Lydia chat bot*/
+  LYDEA: process.env.LYDEA !== undefined ? process.env.LYDEA === 'true' : true,
+  REJECT_CALL: process.env.REJECT_CALL !== undefined ? process.env.REJECT_CALL === 'true' : false, 
+  NOT_ALLOW: process.env.NOT_ALLOW !== undefined ? process.env.NOT_ALLOW === 'true' : true,
+  MODE: process.env.MODE || "public",
+  DELETED_MESSAGES_CHAT_ID: process.env.DELETED_MESSAGES_CHAT_ID || "254740007567@s.whatsapp.net",
+  OWNER_NAME: process.env.OWNER_NAME || "Marisel",
+  OWNER_NUMBER: process.env.OWNER_NUMBER || "218942841878",
+  SUDO_NUMBER: process.env.SUDO_NUMBER || "254740007567",
+  GEMINI_KEY: process.env.GEMINI_KEY || "AIzaSyCUPaxfIdZawsKZKqCqJcC-GWiQPCXKTDc",
+  WELCOME: process.env.WELCOME !== undefined ? process.env.WELCOME === 'true' : false, 
 };
 
-// Debugging: Log the AUTO_BIO value to ensure it's set correctly
-console.log("AUTO_BIO from .env:", process.env.AUTO_BIO);
-console.log("AUTO_BIO in config:", config.AUTO_BIO);
 
-// Export the configuration object
 module.exports = config;
