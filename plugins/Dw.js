@@ -1,107 +1,148 @@
 import fetch from 'node-fetch';
-import _0x11ec39 from '../../config.cjs';
-import _0x1e4301 from 'yt-search';
+import config from '../../config.cjs';
+import yts from 'yt-search';
 
-const apis = [
-  (url) => `https://api-rin-tohsaka.vercel.app/download/ytmp4?url=${encodeURIComponent(url)}`,
-  (url) => `https://api.davidcyriltech.my.id/download/ytmp3?url=${encodeURIComponent(url)}`,
-  (url) => `https://www.dark-yasiya-api.site/download/ytmp3?url=${encodeURIComponent(url)}`,
-  (url) => `https://api.giftedtech.web.id/api/download/dlmp3?url=${encodeURIComponent(url)}&apikey=rahmani-md`,
-  (url) => `https://api.dreaded.site/api/ytdl/audio?url=${encodeURIComponent(url)}`
-];
+// Combined API list with all your endpoints
+const apis = {
+  audio: [
+    (url) => `https://api.bwmxmd.online/api/download/ytmp3?apikey=cracker12&url=${encodeURIComponent(url)}`,
+    (url) => `https://api.davidcyriltech.my.id/download/ytmp3?url=${encodeURIComponent(url)}`,
+    (url) => `https://www.dark-yasiya-api.site/download/ytmp3?url=${encodeURIComponent(url)}`,
+    (url) => `https://api.giftedtech.web.id/api/download/dlmp3?url=${encodeURIComponent(url)}&apikey=rahmani-md`,
+    (url) => `https://api.dreaded.site/api/ytdl/audio?url=${encodeURIComponent(url)}`,
+    (url) => `https://api-rin-tohsaka.vercel.app/download/ytmp3?url=${encodeURIComponent(url)}`
+  ],
+  video: [
+    (url) => `https://api.bwmxmd.online/api/download/ytmp4?apikey=cracker12&url=${encodeURIComponent(url)}`,
+    (url) => `https://api.davidcyriltech.my.id/download/ytmp4?url=${encodeURIComponent(url)}`,
+    (url) => `https://api-rin-tohsaka.vercel.app/download/ytmp4?url=${encodeURIComponent(url)}`
+  ]
+};
 
-async function fetchDownloadLink(videoUrl) {
-  for (let api of apis) {
+async function fetchDownloadLink(videoUrl, type) {
+  const apiList = apis[type] || [];
+  
+  for (let api of apiList) {
     try {
-      const response = await fetch(api(videoUrl));
+      const apiUrl = api(videoUrl);
+      console.log(`Trying API: ${apiUrl}`);
+      
+      const response = await fetch(apiUrl);
+      if (!response.ok) continue;
+      
       const data = await response.json();
       
+      // Handle different API response formats
       if (data.success && data.result?.download_url) {
-        return data.result.download_url; // Return the first working download link
+        return data.result.download_url;
+      } else if (data.url) { // For APIs that return direct URL
+        return data.url;
+      } else if (data.downloadUrl) { // Alternative response format
+        return data.downloadUrl;
       }
     } catch (error) {
-      console.error(`API failed: ${api(videoUrl)}`, error);
+      console.error(`API failed: ${error.message}`);
     }
   }
-  return null; // Return null if all APIs fail
+  return null;
 }
 
-const play = async (_0x126590, _0x3b9015) => {
-  const _0x52890d = _0x11ec39.PREFIX;
-  const _0x588373 = _0x126590.body.startsWith(_0x52890d) 
-    ? _0x126590.body.slice(_0x52890d.length).split(" ")[0].toLowerCase() 
-    : '';
-  
-  const _0x195e93 = _0x126590.body.slice(_0x52890d.length + _0x588373.length).trim();
+const play = async (m, gss) => {
+  const prefix = config.PREFIX;
+  const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+  const query = m.body.slice(prefix.length + cmd.length).trim();
 
-  if (_0x588373 === 'play2') {
-    if (!_0x195e93) return _0x126590.reply("❌ *Please provide a search query!*");
+  if (cmd !== 'play3') return;
 
-    await _0x126590.React('⏳');
+  if (!query) {
+    return m.reply("❌ *Please provide a search query!*\nExample: .play2 baby shark");
+  }
 
-    try {
-      const _0x3e2e17 = await _0x1e4301(_0x195e93);
-      if (!_0x3e2e17.videos.length) return _0x126590.reply("❌ *No results found!*");
-
-      const _0x13d1e1 = _0x3e2e17.videos[0];
-      const videoUrl = _0x13d1e1.url;
-
-      const _0x2955c5 = `\n╭━━━〔 *ᴅᴇᴍᴏɴ sʟᴀʏᴇʀ* 〕━━━
-┃▸ *ᴛɪᴛʟᴇ:* ${_0x13d1e1.title}
-┃▸ *ᴅᴜʀᴀᴛɪᴏɴ:* ${_0x13d1e1.timestamp}
-┃▸ *ᴠɪᴇᴡs:* ${_0x13d1e1.views}
-┃▸ *ᴄʜᴀɴɴᴇʟ:* ${_0x13d1e1.author.name}
-╰━━━━━━━━━━━━━━━━━━
-📥 *ᴄʜᴏᴏsᴇ ᴀɴ ᴏᴘᴛɪᴏɴ ᴛᴏ ᴅᴏᴡɴʟᴏᴀᴅ:*
-*1️⃣ ᴠɪᴅᴇᴏ*
-*2️⃣ Audio*
-*3️⃣ ᴠɪᴅᴇᴏ (ᴅᴏᴄᴜᴍᴇɴᴛ)*
-*4 ᴀᴜᴅɪᴏ (ᴅᴏᴄᴜᴍᴇɴᴛ)*`;
-
-      const _0x5c46de = {
-        image: { url: _0x13d1e1.thumbnail },
-        caption: _0x2955c5
-      };
-
-      const _0x43f0e4 = await _0x3b9015.sendMessage(_0x126590.from, _0x5c46de, { quoted: _0x126590 });
-      const _0x343189 = _0x43f0e4.key.id;
-
-      _0x3b9015.ev.on("messages.upsert", async (_0x5c9216) => {
-        const _0x42338a = _0x5c9216.messages[0];
-        if (!_0x42338a.message) return;
-
-        const _0x8cd70e = _0x42338a.message.conversation || _0x42338a.message.extendedTextMessage?.text;
-        const _0xb6a988 = _0x42338a.key.remoteJid;
-        const _0x2e2bfe = _0x42338a.message.extendedTextMessage && _0x42338a.message.extendedTextMessage.contextInfo.stanzaId === _0x343189;
-
-        if (_0x2e2bfe) {
-          await _0x3b9015.sendMessage(_0xb6a988, { react: { text: '⬇️', key: _0x42338a.key } });
-
-          let fileType, mimeType;
-          if (_0x8cd70e === '1' || _0x8cd70e === '3') {
-            fileType = _0x8cd70e === '1' ? "video" : "document";
-            mimeType = "video/mp4";
-          } else if (_0x8cd70e === '2' || _0x8cd70e === '4') {
-            fileType = _0x8cd70e === '2' ? "audio" : "document";
-            mimeType = "audio/mpeg";
-          } else {
-            return _0x126590.reply("❌ *Invalid selection! Please reply with 1, 2, 3, or 4.*");
-          }
-
-          const downloadUrl = await fetchDownloadLink(videoUrl);
-          if (!downloadUrl) return _0x126590.reply("❌ *Download failed, please try again.*");
-
-          const messageOptions = fileType === "document"
-            ? { document: { url: downloadUrl }, mimetype: mimeType, fileName: `Demon_Slayer_${fileType}.mp4`, caption: "> *ᴍᴀᴅᴇ ʙʏ ᴄʀᴇᴡ sʟᴀʏᴇʀ*" }
-            : { [fileType]: { url: downloadUrl }, mimetype: mimeType, caption: "> *ᴍᴀᴅᴇ ʙʏ ᴄʀᴇᴡ sʟᴀʏᴇʀ*" };
-
-          await _0x3b9015.sendMessage(_0xb6a988, messageOptions, { quoted: _0x42338a });
-        }
-      });
-    } catch (error) {
-      console.error("Error:", error);
-      return _0x126590.reply("❌ *An error occurred while processing your request.*");
+  try {
+    await m.React('⏳');
+    const searchResults = await yts(query);
+    
+    if (!searchResults.videos.length) {
+      await m.React('❌');
+      return m.reply("❌ *No results found!*");
     }
+
+    const video = searchResults.videos[0];
+    const waitMsg = await m.reply(`⏳ *Processing:* ${video.title}\n\nPlease wait...`);
+
+    const caption = `
+╭━━━〔 *${config.BOT_NAME}* 〕━━━
+┃▸ *Title:* ${video.title}
+┃▸ *Duration:* ${video.timestamp}
+┃▸ *Views:* ${video.views}
+┃▸ *Channel:* ${video.author.name}
+╰━━━━━━━━━━━━━━━━━━
+📥 *Choose download option:*
+1️⃣ Video (MP4)
+2️⃣ Audio (MP3)
+3️⃣ Video (Document)
+4️⃣ Audio (Document)`;
+
+    await gss.sendMessage(
+      m.from,
+      {
+        image: { url: video.thumbnail },
+        caption: caption
+      },
+      { quoted: m }
+    );
+
+    // Handle user response
+    gss.ev.on('messages.upsert', async ({ messages }) => {
+      const msg = messages[0];
+      if (!msg.message || !msg.key.fromMe) return;
+
+      const response = msg.message.conversation || msg.message.extendedTextMessage?.text;
+      if (!['1','2','3','4'].includes(response)) return;
+
+      try {
+        await m.React('⬇️');
+        const type = response === '1' || response === '3' ? 'video' : 'audio';
+        const isDocument = response === '3' || response === '4';
+
+        const downloadUrl = await fetchDownloadLink(video.url, type);
+        if (!downloadUrl) {
+          await m.React('❌');
+          return m.reply("❌ *All download methods failed. Please try again later.*");
+        }
+
+        const fileExt = type === 'video' ? 'mp4' : 'mp3';
+        const fileName = `${video.title}.${fileExt}`.replace(/[^\w\s.-]/gi, '');
+
+        const messageOptions = isDocument 
+          ? {
+              document: { url: downloadUrl },
+              mimetype: type === 'video' ? 'video/mp4' : 'audio/mpeg',
+              fileName: fileName,
+              caption: `✅ *Download Complete*\n\n${video.title}`
+            }
+          : {
+              [type]: { url: downloadUrl },
+              mimetype: type === 'video' ? 'video/mp4' : 'audio/mpeg',
+              caption: `✅ *Download Complete*\n\n${video.title}`
+            };
+
+        await gss.sendMessage(m.from, messageOptions, { quoted: m });
+        await m.React('✅');
+        await gss.sendMessage(m.from, { delete: waitMsg.key });
+
+      } catch (error) {
+        console.error("Download error:", error);
+        await m.React('❌');
+        m.reply("❌ *Download failed. Please try again.*");
+      }
+    });
+
+  } catch (error) {
+    console.error("Error:", error);
+    await m.React('❌');
+    m.reply("❌ *An error occurred. Please try again.*");
+    if (waitMsg) await gss.sendMessage(m.from, { delete: waitMsg.key });
   }
 };
 
