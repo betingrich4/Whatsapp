@@ -1,175 +1,162 @@
-import config from '../../config.cjs';
-import yts from 'yt-search';
-import axios from 'axios';
-import { generateWAMessageFromContent, proto, prepareWAMessageMedia } from '@whiskeysockets/baileys';
+import axios from "axios";
+import yts from "yt-search";
+import config from '../config.cjs';
 
 const play = async (m, gss) => {
-    const prefix = config.PREFIX;
-    const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-    const query = m.body.slice(prefix.length + cmd.length).trim();
+  const prefix = config.PREFIX;
+  const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(" ")[0].toLowerCase() : "";
+  const args = m.body.slice(prefix.length + cmd.length).trim();
 
-    if (cmd !== 'play') return;
-
-    if (!query) {
-        return m.reply("❌ *Please provide a search query!*");
+  if (cmd === "play") {
+    if (!args) {
+      return m.reply("*Please provide a song name or YouTube URL*\n\nExample: .play baby shark");
     }
-
-    await m.React('⏳');
 
     try {
-        const searchResults = await yts(query);
+      // Check if it's a YouTube URL
+      const isYtUrl = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/.test(args);
+      
+      let videoInfo;
+      if (isYtUrl) {
+        // Extract video ID from URL
+        const videoId = args.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|youtu\.be\/)([^"&?\/\s]{11})/)[1];
+        const searchResults = await yts({ videoId });
+        videoInfo = searchResults.videos[0];
+      } else {
+        // Search YouTube
+        const searchResults = await yts(args);
         if (!searchResults.videos.length) {
-            return m.reply("❌ *No results found!*");
+          return m.reply(`❌ No results found for "${args}"`);
         }
+        videoInfo = searchResults.videos[0];
+      }
 
-        const video = searchResults.videos[0];
-        const buttons = [
-            {
-                name: "quick_reply",
-                buttonParamsJson: JSON.stringify({
-                    display_text: "🎥 Video (MP4)",
-                    id: "video_" + video.videoId
-                })
-            },
-            {
-                name: "quick_reply",
-                buttonParamsJson: JSON.stringify({
-                    display_text: "🎧 Audio (MP3)",
-                    id: "audio_" + video.videoId
-                })
-            },
-            {
-                name: "quick_reply",
-                buttonParamsJson: JSON.stringify({
-                    display_text: "📁 Video (Document)",
-                    id: "video_doc_" + video.videoId
-                })
-            },
-            {
-                name: "quick_reply",
-                buttonParamsJson: JSON.stringify({
-                    display_text: "📁 Audio (Document)",
-                    id: "audio_doc_" + video.videoId
-                })
-            }
-        ];
+      const processingMsg = await m.reply(`⏳ *Processing:* ${videoInfo.title}\n\nPlease wait...`);
 
-        const caption = `
-╭━━━〔 *${config.BOT_NAME}* 〕━━━
-┃▸ *Title:* ${video.title}
-┃▸ *Duration:* ${video.timestamp}
-┃▸ *Views:* ${video.views}
-┃▸ *Channel:* ${video.author.name}
-╰━━━━━━━━━━━━━━━━━━
-`;
+      // Prepare both API endpoints
+      const audioApiUrl = `https://api.bwmxmd.online/api/download/ytmp3?apikey=cracker12&url=${encodeURIComponent(videoInfo.url)}`;
+      const videoApiUrl = `https://api.bwmxmd.online/api/download/ytmp4?apikey=cracker12&url=${encodeURIComponent(videoInfo.url)}`;
+      const backupAudioApiUrl = `https://api.davidcyriltech.my.id/download/ytmp3?url=${encodeURIComponent(videoInfo.url)}`;
 
-        const interactiveMsg = generateWAMessageFromContent(m.from, {
-            viewOnceMessage: {
-                message: {
-                    interactiveMessage: proto.Message.InteractiveMessage.create({
-                        body: proto.Message.InteractiveMessage.Body.create({
-                            text: caption
-                        }),
-                        footer: proto.Message.InteractiveMessage.Footer.create({
-                            text: `*Powered by Demon Slayer*`
-                        }),
-                        header: proto.Message.InteractiveMessage.Header.create({
-                            ...(await prepareWAMessageMedia({
-                                image: { url: video.thumbnail }
-                            }, { upload: gss.waUploadToServer })),
-                            title: video.title.substring(0, 30),
-                            gifPlayback: false
-                        }),
-                        nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-                            buttons: buttons
-                        }),
-                        contextInfo: {
-                            mentionedJid: [m.sender]
-                        }
-                    })
-                }
-            }
-        }, {});
+      // Create interactive buttons
+      const buttons = [
+        {
+          quickReplyButton: {
+            displayText: "🎧 Download Audio",
+            id: `audio_${videoInfo.videoId}`
+          }
+        },
+        {
+          quickReplyButton: {
+            displayText: "🎥 Download Video",
+            id: `video_${videoInfo.videoId}`
+          }
+        }
+      ];
 
-        await gss.relayMessage(interactiveMsg.key.remoteJid, interactiveMsg.message, {
-            messageId: interactiveMsg.key.id
-        });
-        await m.React('✅');
+      await gss.sendMessage(
+        m.from,
+        {
+          text: `*${videoInfo.title}*\n\n` +
+                `⏱ Duration: ${videoInfo.timestamp}\n` +
+                `👀 Views: ${videoInfo.views}\n` +
+                `👤 Channel: ${videoInfo.author.name}\n\n` +
+                `Choose download option:`,
+          footer: config.BOT_NAME,
+          buttons: buttons,
+          headerType: 1,
+          viewOnce: true
+        },
+        { quoted: m }
+      );
+
+      await gss.sendMessage(m.from, { delete: processingMsg.key });
 
     } catch (error) {
-        console.error("Error:", error);
-        await m.React('❌');
-        return m.reply("❌ *An error occurred while processing your request.*");
+      console.error("Search Error:", error);
+      m.reply("❌ Error processing your request. Please try again.");
     }
+  }
 };
 
-// Handle button interactions
+// Handle button responses
 play.before = async (m, gss) => {
-    const selectedId = m.message?.templateButtonReplyMessage?.selectedId || 
-                      JSON.parse(m.message?.interactiveResponseMessage?.nativeFlowResponseMessage?.paramsJson || '{}').id;
+  const selectedId = m.message?.buttonsResponseMessage?.selectedButtonId || 
+                    m.message?.templateButtonReplyMessage?.selectedId;
 
-    if (!selectedId) return;
+  if (!selectedId) return;
+
+  try {
+    const [type, videoId] = selectedId.split('_');
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    let apiUrl, fileType, mimeType;
+
+    if (type === 'audio') {
+      apiUrl = `https://api.bwmxmd.online/api/download/ytmp3?apikey=cracker12&url=${encodeURIComponent(videoUrl)}`;
+      fileType = 'audio';
+      mimeType = 'audio/mpeg';
+    } else if (type === 'video') {
+      apiUrl = `https://api.bwmxmd.online/api/download/ytmp4?apikey=cracker12&url=${encodeURIComponent(videoUrl)}`;
+      fileType = 'video';
+      mimeType = 'video/mp4';
+    } else {
+      return;
+    }
+
+    const waitMsg = await m.reply(`⏳ Downloading ${type}...`);
 
     try {
-        const [type, videoId] = selectedId.split('_');
-        const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        let apiUrl, fileType, mimeType, fileName, caption;
+      // Try primary API first
+      const { data } = await axios.get(apiUrl, { responseType: 'arraybuffer' });
 
-        switch(type) {
-            case 'video':
-                apiUrl = `https://api.bwmxmd.online/api/download/ytmp4?apikey=cracker12&url=${encodeURIComponent(ytUrl)}`;
-                fileType = 'video';
-                mimeType = 'video/mp4';
-                fileName = `video_${Date.now()}.mp4`;
-                caption = '🎥 *Video Download Complete*';
-                break;
-            case 'audio':
-                apiUrl = `https://api.bwmxmd.online/api/download/ytmp3?apikey=cracker12&url=${encodeURIComponent(ytUrl)}`;
-                fileType = 'audio';
-                mimeType = 'audio/mpeg';
-                fileName = `audio_${Date.now()}.mp3`;
-                caption = '🎧 *Audio Download Complete*';
-                break;
-            case 'video_doc':
-                apiUrl = `https://api.bwmxmd.online/api/download/ytmp4?apikey=cracker12&url=${encodeURIComponent(ytUrl)}`;
-                fileType = 'document';
-                mimeType = 'video/mp4';
-                fileName = `video_${Date.now()}.mp4`;
-                caption = '📁 *Video Document Download Complete*';
-                break;
-            case 'audio_doc':
-                apiUrl = `https://api.bwmxmd.online/api/download/ytmp3?apikey=cracker12&url=${encodeURIComponent(ytUrl)}`;
-                fileType = 'document';
-                mimeType = 'audio/mpeg';
-                fileName = `audio_${Date.now()}.mp3`;
-                caption = '📁 *Audio Document Download Complete*';
-                break;
-            default:
-                return;
+      await gss.sendMessage(
+        m.from,
+        {
+          [fileType]: data,
+          mimetype: mimeType,
+          caption: `✅ Download complete!\n\nPowered by ${config.BOT_NAME}`
+        },
+        { quoted: m }
+      );
+
+    } catch (primaryError) {
+      console.error("Primary API failed, trying backup:", primaryError);
+      
+      // Fallback to backup API for audio
+      if (type === 'audio') {
+        try {
+          const backupResponse = await axios.get(
+            `https://api.davidcyriltech.my.id/download/ytmp3?url=${encodeURIComponent(videoUrl)}`
+          );
+
+          if (backupResponse.data?.success) {
+            await gss.sendMessage(
+              m.from,
+              {
+                audio: { url: backupResponse.data.result.download_url },
+                mimetype: 'audio/mpeg',
+                caption: `✅ Download complete!\n\nPowered by ${config.BOT_NAME}`
+              },
+              { quoted: m }
+            );
+          } else {
+            throw new Error("Backup API failed");
+          }
+        } catch (backupError) {
+          console.error("Backup API failed:", backupError);
+          await m.reply("❌ All download methods failed. Please try again later.");
         }
-
-        const waitMsg = await m.reply('⏳ Downloading... Please wait');
-        const { data } = await axios.get(apiUrl, { responseType: 'arraybuffer' });
-
-        await gss.sendMessage(
-            m.from,
-            {
-                [fileType]: data,
-                mimetype: mimeType,
-                fileName: fileName,
-                caption: `${caption}\n\n🔗 ${ytUrl}\n📥 Via ${config.BOT_NAME}`
-            },
-            { quoted: m }
-        );
-
-        await gss.sendMessage(m.from, { delete: waitMsg.key });
-        await m.React('✅');
-
-    } catch (error) {
-        console.error("Button Error:", error);
-        await m.React('❌');
-        return m.reply("❌ *Download failed. Please try again later.*");
+      } else {
+        await m.reply("❌ Video download failed. Please try again later.");
+      }
     }
+
+    await gss.sendMessage(m.from, { delete: waitMsg.key });
+
+  } catch (error) {
+    console.error("Button Error:", error);
+    m.reply("❌ Error processing your download request.");
+  }
 };
 
 export default play;
