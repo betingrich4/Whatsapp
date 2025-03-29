@@ -1,107 +1,133 @@
-import config from '../config.cjs';
-import axios from 'axios';
-import fs from 'fs';
-import path from 'path';
-import AdmZip from 'adm-zip';
-import { exec } from 'child_process';
+import axios from "axios";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from 'url';
+import AdmZip from "adm-zip";
 
-const updateCommand = async (m, Matrix) => {
-  const botNumber = await Matrix.decodeJid(Matrix.user.id);
-  const isCreator = [botNumber, config.OWNER_NUMBER + '@s.whatsapp.net'].includes(m.sender);
-  const prefix = config.PREFIX;
-  const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+// Get current directory path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  if (cmd !== 'update') return;
-  if (!isCreator) return m.reply("*ᴛʜɪs ɪs ᴀɴ ᴏᴡɴᴇʀ ᴄᴏᴍᴍᴀɴᴅ*");
+// Import config
+const configPath = path.join(__dirname, '../config.cjs');
+const config = await import(configPath).then(m => m.default || m).catch(() => ({}));
 
-  let responseMessage;
+const update = async (m, Matrix) => {
+    const prefix = config.PREFIX || '.'; // Default prefix if not in config
+    const cmd = m.body.startsWith(prefix)
+        ? m.body.slice(prefix.length).split(" ")[0].toLowerCase()
+        : "";
 
-  try {
-    await m.reply("```ᴄʜᴇᴄᴋɪɴɢ ғᴏʀ ᴅ3ᴍᴏɴ sʟᴀʏᴇʀ ᴜᴘᴅᴀᴛᴇs...```\n");
+    if (cmd === "update") {
+        // Only allow the bot itself to use this command
+        const botNumber = await Matrix.decodeJid(Matrix.user.id);
+        if (m.sender !== botNumber) {
+            return Matrix.sendMessage(m.from, { text: "*Only Marisel can use this command!*" }, { quoted: m });
+        }
 
-    // Get latest commit from GitHub
-    const { data: commitData } = await axios.get("https://api.github.com/repos/JawadYTX/JAWAD-MD/commits/main");
-    const latestCommitHash = commitData.sha;
+        await m.React("⏳");
 
-    // Get current commit hash
-    let currentHash = 'unknown';
-    try {
-      const packageJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'package.json')));
-      currentHash = packageJson.commitHash || 'unknown';
-    } catch (error) {
-      console.error("Error reading package.json:", error);
+        try {
+            console.log("Checking for updates...");
+            const msg = await Matrix.sendMessage(m.from, { text: "```Checking for updates...```" }, { quoted: m });
+
+            const editMessage = async (newText) => {
+                try {
+                    await Matrix.sendMessage(m.from, { text: newText, edit: msg.key });
+                } catch (error) {
+                    console.error("Message edit failed:", error);
+                }
+            };
+
+            // Fetch latest commit hash
+            const { data: commitData } = await axios.get(
+                "https://api.github.com/repos/betingrich4/Whatsapp/commits/main"
+            );
+            const latestCommitHash = commitData.sha;
+
+            // Load package.json
+            const packageJsonPath = path.join(process.cwd(), "package.json");
+            const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+            const currentHash = packageJson.commitHash || "unknown";
+
+            if (latestCommitHash === currentHash) {
+                await m.React("✅");
+                return editMessage("```✅ Bot is already up to date!```");
+            }
+
+            await editMessage("```New update found! Downloading...```");
+
+            // Download latest ZIP
+            const zipPath = path.join(process.cwd(), "latest.zip");
+            const writer = fs.createWriteStream(zipPath);
+            
+            const response = await axios({
+                method: 'get',
+                url: "https://github.com/betingrich4/Whatsapp/archive/main.zip",
+                responseType: 'stream'
+            });
+
+            response.data.pipe(writer);
+
+            await new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+
+            await editMessage("```Extracting the latest code...```");
+
+            // Extract ZIP
+            const extractPath = path.join(process.cwd(), "latest");
+            const zip = new AdmZip(zipPath);
+            zip.extractAllTo(extractPath, true);
+
+            await editMessage("```🔄 Replacing files...```");
+
+            // Replace files while skipping important configs
+            const sourcePath = path.join(extractPath, "Whatsapp-main");
+            await copyFolderSync(sourcePath, process.cwd(), ['package.json', 'config.cjs', '.env']);
+
+            // Update package.json with new commit hash
+            packageJson.commitHash = latestCommitHash;
+            fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
+
+            // Cleanup
+            fs.unlinkSync(zipPath);
+            fs.rmSync(extractPath, { recursive: true, force: true });
+
+            await editMessage("```♻️ Restarting to apply updates...```");
+            setTimeout(() => process.exit(0), 2000);
+
+        } catch (error) {
+            console.error("❌ Update error:", error);
+            await m.React("❌");
+            await Matrix.sendMessage(m.from, 
+                { text: `❌ Update failed:\n${error.message}` }, 
+                { quoted: m }
+            );
+        }
     }
-
-    if (latestCommitHash === currentHash) {
-      return m.reply("```✅ Your JAWAD-MD bot is already up-to-date!```\n");
-    }
-
-    await m.reply("```ᴅᴇᴍᴏɴ sʟᴀᴜᴇʀ ᴜᴘᴅᴀᴛɪɴɢ...```\n");
-
-    // Download latest code
-    const zipPath = path.join(process.cwd(), "latest.zip");
-    const { data: zipData } = await axios.get("https://github.com/Demon-Slayer2/DEMONS-SLAYER-XMD/archive/main.zip", { responseType: "arraybuffer" });
-    fs.writeFileSync(zipPath, zipData);
-
-    await m.reply("```📦 Extracting the latest code...```\n");
-
-    // Extract ZIP file
-    const extractPath = path.join(process.cwd(), 'latest');
-    const zip = new AdmZip(zipPath);
-    zip.extractAllTo(extractPath, true);
-
-    await m.reply("```ʀᴇᴘʟᴀᴄɪɴɢ ғɪʟᴇ...```\n");
-
-    // Copy updated files, skipping config.js and app.json
-    const sourcePath = path.join(extractPath, "DEMONS-SLAYER-XMD-main");
-    copyFolderSync(sourcePath, process.cwd());
-
-    // Cleanup
-    fs.unlinkSync(zipPath);
-    fs.rmSync(extractPath, { recursive: true, force: true });
-
-    responseMessage = "```ʙᴏᴛ sᴜᴄᴄᴇssғᴜʟʟʏ ᴜᴘᴅᴀᴛᴇᴅ,ɪᴛ ᴡɪʟʟ ʀᴇsᴛᴀʀᴛ sᴏᴏɴ...```";
-    await m.reply(responseMessage);
-
-    // Restart the bot after update
-    exec("pm2 restart all", (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Restart error: ${error.message}`);
-        return;
-      }
-      if (stderr) console.error(`Restart stderr: ${stderr}`);
-      console.log(`Restart stdout: ${stdout}`);
-    });
-
-  } catch (error) {
-    console.error("Update error:", error);
-    m.reply("❌ Update failed. Please try manually.");
-  }
 };
 
-// Helper function to copy directories while preserving config.js and app.json
-function copyFolderSync(source, target) {
-  if (!fs.existsSync(target)) {
-    fs.mkdirSync(target, { recursive: true });
-  }
-
-  const items = fs.readdirSync(source);
-  for (const item of items) {
-    const srcPath = path.join(source, item);
-    const destPath = path.join(target, item);
-
-    // Skip config.js and app.json
-    if (item === "config.js" || item === "app.json") {
-      console.log(`Skipping ${item} to preserve custom settings.`);
-      continue;
+async function copyFolderSync(source, target, filesToSkip = []) {
+    if (!fs.existsSync(target)) {
+        fs.mkdirSync(target, { recursive: true });
     }
 
-    if (fs.lstatSync(srcPath).isDirectory()) {
-      copyFolderSync(srcPath, destPath);
-    } else {
-      fs.copyFileSync(srcPath, destPath);
+    const items = fs.readdirSync(source);
+    for (const item of items) {
+        const srcPath = path.join(source, item);
+        const destPath = path.join(target, item);
+
+        if (filesToSkip.includes(item)) continue;
+
+        const stat = fs.lstatSync(srcPath);
+        if (stat.isDirectory()) {
+            await copyFolderSync(srcPath, destPath, filesToSkip);
+        } else {
+            fs.copyFileSync(srcPath, destPath);
+        }
     }
-  }
 }
 
-export default updateCommand;
+export default update; 
