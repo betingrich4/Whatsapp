@@ -7,28 +7,30 @@ const autoBio = async (m, gss) => {
   try {
     const cmd = m.body.toLowerCase().trim();
 
+    // Enable autobio (every second)
     if (cmd === "autobio on") {
       if (!autoBioInterval) {
         autoBioInterval = setInterval(async () => {
           try {
             const now = new Date();
-            
-            // Format time (03:20:33)
-            const time = now.toLocaleTimeString('en-KE', {
+            const options = {
               timeZone: 'Africa/Nairobi',
               hour: '2-digit',
               minute: '2-digit',
               second: '2-digit',
-              hour12: false // Use 24-hour format
-            }).replace(/\./g, ':'); // Fix formatting if needed
+              hour12: false // 24-hour format (03:20:33 instead of 3:20:33 AM)
+            };
 
-            // Format day (Saturday)
+            // Format time (HH:MM:SS)
+            const time = now.toLocaleTimeString('en-KE', options);
+            
+            // Format day (e.g., Saturday)
             const day = now.toLocaleDateString('en-KE', {
               timeZone: 'Africa/Nairobi',
               weekday: 'long'
             });
 
-            // Format date (29 March 2025)
+            // Format date (e.g., 29 March 2025)
             const date = now.toLocaleDateString('en-KE', {
               timeZone: 'Africa/Nairobi',
               day: 'numeric',
@@ -36,32 +38,36 @@ const autoBio = async (m, gss) => {
               year: 'numeric'
             });
 
-            // Create clean bio message
+            // Final bio message
             const bioMessage = `⏰ ${time} | ${day} | 📅 ${date} | Marisel`;
 
+            // Update bio
             await gss.updateProfileStatus(bioMessage);
-            console.log(chalk.green(`[Nairobi Time] Bio updated: ${bioMessage}`));
+            console.log(chalk.green(`[Bio Updated] ${bioMessage}`));
           } catch (error) {
             console.error("Error updating bio:", error);
           }
-        }, 60000);
-
-        return m.reply("*Auto-Bio is now activated with proper formatting.*");
+        }, 1000); // ⚡ Update every 1000ms (1 second) instead of 60000ms (60 seconds)
+        
+        return m.reply("*Auto-Bio is now updating every second!*");
+      } else {
+        return m.reply("*Auto-Bio is already running.*");
       }
-      return m.reply("*Auto-Bio is already active.*");
     }
 
+    // Disable autobio
     if (cmd === "autobio off") {
       if (autoBioInterval) {
         clearInterval(autoBioInterval);
         autoBioInterval = null;
-        return m.reply("*Auto-Bio disabled.*");
+        return m.reply("*Auto-Bio stopped.*");
+      } else {
+        return m.reply("*Auto-Bio isn't active.*");
       }
-      return m.reply("*Auto-Bio isn't active.*");
     }
   } catch (error) {
-    console.error("Auto-Bio error:", error);
-    m.reply("*⚠️ Bio update failed. Try again.*");
+    console.error("Auto-Bio Error:", error);
+    m.reply("⚠️ *Failed to update bio. Try again.*");
   }
 };
 
