@@ -1,36 +1,34 @@
 import config from "../config.cjs";
 import chalk from "chalk";
 
-let autoBioInterval = null; // To store the interval for auto-updating bio
+let autoBioInterval = null;
 
 const autoBio = async (m, gss) => {
   try {
     const cmd = m.body.toLowerCase().trim();
 
-    // Enable autobio
     if (cmd === "autobio on") {
-      // Start auto-updating bio (no owner check)
       if (!autoBioInterval) {
         autoBioInterval = setInterval(async () => {
           try {
-            // Get current time and date in Africa/Nairobi timezone
             const now = new Date();
-            const options = {
+            
+            // Format time (03:20:33)
+            const time = now.toLocaleTimeString('en-KE', {
               timeZone: 'Africa/Nairobi',
               hour: '2-digit',
               minute: '2-digit',
               second: '2-digit',
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric'
-            };
-            
-            const time = now.toLocaleTimeString('en-KE', options); // en-KE for Kenya English
-            const day = now.toLocaleDateString('en-KE', { 
+              hour12: false // Use 24-hour format
+            }).replace(/\./g, ':'); // Fix formatting if needed
+
+            // Format day (Saturday)
+            const day = now.toLocaleDateString('en-KE', {
               timeZone: 'Africa/Nairobi',
-              weekday: 'long' 
+              weekday: 'long'
             });
+
+            // Format date (29 March 2025)
             const date = now.toLocaleDateString('en-KE', {
               timeZone: 'Africa/Nairobi',
               day: 'numeric',
@@ -38,39 +36,32 @@ const autoBio = async (m, gss) => {
               year: 'numeric'
             });
 
-            // Create the bio message with Nairobi time
-            const bioMessage = `${time} | ${day} | ${date} Marisel`;
+            // Create clean bio message
+            const bioMessage = `⏰ ${time} | ${day} | 📅 ${date} | Marisel`;
 
-            // Update the bot's profile bio
             await gss.updateProfileStatus(bioMessage);
-
-            // Log the update
-            console.log(chalk.green(`[Nairobi Time] Bot bio updated: ${bioMessage}`));
+            console.log(chalk.green(`[Nairobi Time] Bio updated: ${bioMessage}`));
           } catch (error) {
             console.error("Error updating bio:", error);
           }
-        }, 60000); // Update every 60 seconds
+        }, 60000);
 
-        return m.reply("*Auto-Bio (Nairobi Time) is now activated.*\n\n> *The bot's profile bio will show current Nairobi time automatically.*");
-      } else {
-        return m.reply("*Auto-Bio is already active.*");
+        return m.reply("*Auto-Bio is now activated with proper formatting.*");
       }
+      return m.reply("*Auto-Bio is already active.*");
     }
 
-    // Disable autobio
     if (cmd === "autobio off") {
-      // Stop auto-updating bio (no owner check)
       if (autoBioInterval) {
         clearInterval(autoBioInterval);
         autoBioInterval = null;
-        return m.reply("*Auto-Bio is now disabled.*\n\n> *The bot's profile bio will no longer update automatically.*");
-      } else {
-        return m.reply("*Auto-Bio is already inactive.*");
+        return m.reply("*Auto-Bio disabled.*");
       }
+      return m.reply("*Auto-Bio isn't active.*");
     }
   } catch (error) {
-    console.error("Error in Auto-Bio:", error);
-    m.reply("*⚠️ An error occurred while processing Auto-Bio.*\n\n> *Please try again later*");
+    console.error("Auto-Bio error:", error);
+    m.reply("*⚠️ Bio update failed. Try again.*");
   }
 };
 
