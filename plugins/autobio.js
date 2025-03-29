@@ -9,13 +9,7 @@ const autoBio = async (m, gss) => {
 
     // Enable autobio
     if (cmd === "autobio on") {
-      // Check if the command is sent by the bot owner
-      const isOwner = [config.OWNER_NUMBER + '@s.whatsapp.net'].includes(m.sender);
-      if (!isOwner) {
-        return m.reply("*THIS IS AN OWNER COMMAND*");
-      }
-
-      // Start auto-updating bio
+      // Start auto-updating bio (no owner check)
       if (!autoBioInterval) {
         autoBioInterval = setInterval(async () => {
           try {
@@ -57,7 +51,7 @@ const autoBio = async (m, gss) => {
           }
         }, 60000); // Update every 60 seconds
 
-        return m.reply("*Auto-Bio is now activated.*\n\n> *The bot's profile bio will show current Nairobi time automatically.*");
+        return m.reply("*Auto-Bio (Nairobi Time) is now activated.*\n\n> *The bot's profile bio will show current Nairobi time automatically.*");
       } else {
         return m.reply("*Auto-Bio is already active.*");
       }
@@ -65,13 +59,7 @@ const autoBio = async (m, gss) => {
 
     // Disable autobio
     if (cmd === "autobio off") {
-      // Check if the command is sent by the bot owner
-      const isOwner = [config.OWNER_NUMBER + '@s.whatsapp.net'].includes(m.sender);
-      if (!isOwner) {
-        return m.reply("*📛 THIS IS AN OWNER COMMAND*");
-      }
-
-      // Stop auto-updating bio
+      // Stop auto-updating bio (no owner check)
       if (autoBioInterval) {
         clearInterval(autoBioInterval);
         autoBioInterval = null;
