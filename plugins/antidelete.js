@@ -3,7 +3,7 @@ const { proto } = pkg;
 import config from '../../config.cjs'; // Ensure config has ANTI_DELETE setting
 
 // Global toggle for anti-delete (based on config file)
-let antiDeleteEnabled = config.ANTI_DELETE || false;  // Read the setting from config
+let antiDeleteEnabled = config.ANTI_DELETE || false;  
 const messageCache = new Map();
 const sentMessages = new Set();  // Track sent deleted message IDs
 
@@ -27,8 +27,8 @@ const AntiDelete = async (m, Matrix) => {
                          msg.message.audioMessage ? '[Audio]' :
                          '[Media Message]'),
                 sender: msg.key.participant || msg.key.remoteJid,
-                timestamp: new Date().getTime(), // Save timestamp in milliseconds
-                chatJid: msg.key.remoteJid
+                chatJid: msg.key.remoteJid,
+                timestamp: Date.now(), // Save timestamp in milliseconds
             });
         });
     });
@@ -86,50 +86,44 @@ Current Status: ${antiDeleteEnabled ? '✅ ACTIVE' : '❌ INACTIVE'}
     }
 
     // Handle message deletions globally when enabled
-    Matrix.ev.on('messages.update', async (update) => {
+    Matrix.ev.on('messages.update', async (updates) => {
         if (!antiDeleteEnabled) return;
 
         try {
-            for (const item of update) {
-                const { key, update: { message: deletedMessage } } = item;
-                if (key.fromMe) continue;
+            for (const update of updates) {
+                const { key, update: updateData } = update;
 
-                const cachedMsg = messageCache.get(key.id);
-                if (!cachedMsg || sentMessages.has(key.id)) continue;  // Check if already sent
+                // Check if the update contains a deleted message (null means deleted)
+                if (!updateData?.message) {
+                    const cachedMsg = messageCache.get(key.id);
+                    if (!cachedMsg || sentMessages.has(key.id)) continue;
 
-                // Only send the content of the deleted message
-                const deletedMsgContent = cachedMsg.content;
-
-                // Prepare the forwarded newsletter message details
-                const forwardedMessage = {
-                    text: `*DELETED MESSAGE*:\n\n${deletedMsgContent}`,
-                    contextInfo: {
-                        isForwarded: true,
-                        forwardedNewsletterMessageInfo: {
-                            newsletterJid: '120363299029326322@newsletter',
-                            newsletterName: "Demon-Slayer",
-                            serverMessageId: -1,
+                    // Prepare the forwarded deleted message content
+                    const forwardedMessage = {
+                        text: `*DELETED MESSAGE*:\n\n${cachedMsg.content}`,
+                        contextInfo: {
+                            isForwarded: true,
+                            forwardingScore: 999, 
+                            externalAdReply: {
+                                title: "Demon-Slayer Antidelete",
+                                body: "Made by Marisel",
+                                thumbnailUrl: 'https://files.catbox.moe/wx5i1n.jpg',
+                                sourceUrl: 'https://whatsapp.com/channel/0029Vak2PevK0IBh2pKJPp2K', 
+                                mediaType: 1, 
+                                renderLargerThumbnail: false,
+                            },
                         },
-                        forwardingScore: 999, // Score to indicate it has been forwarded
-                        externalAdReply: {
-                            title: "Demon-Slayer Antidelete",
-                            body: "Made by Marisel",
-                            thumbnailUrl: 'https://files.catbox.moe/wx5i1n.jpg', // Add thumbnail URL if required
-                            sourceUrl: 'https://whatsapp.com/channel/0029Vak2PevK0IBh2pKJPp2K', // Add source URL if necessary
-                            mediaType: 1, // Image media type
-                            renderLargerThumbnail: false,
-                        },
-                    },
-                };
+                    };
 
-                // Send the deleted message content as a forwarded message
-                await Matrix.sendMessage(key.remoteJid, forwardedMessage, { quoted: m });
+                    // Only send the deleted message if it's deleted (not sent normally)
+                    await Matrix.sendMessage(key.remoteJid, forwardedMessage);
 
-                // Mark the message as sent to prevent duplicate notifications
-                sentMessages.add(key.id);
+                    // Mark as sent to avoid duplicates
+                    sentMessages.add(key.id);
 
-                // Remove the deleted message from cache
-                messageCache.delete(key.id);
+                    // Remove from cache to avoid memory leaks
+                    messageCache.delete(key.id);
+                }
             }
         } catch (error) {
             console.error('Anti-Delete Handler Error:', error);
