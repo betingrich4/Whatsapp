@@ -3,7 +3,7 @@ const { proto } = pkg;
 import config from '../../config.cjs'; // Ensure config has ANTI_DELETE setting
 
 // Global toggle for anti-delete (based on config file)
-let antiDeleteEnabled = config.ANTI_DELETE || false;  // Read the setting from config
+let antiDeleteEnabled = config.ANTI_DELETE || true;  // Read the setting from config
 const messageCache = new Map();
 
 const AntiDelete = async (m, Matrix) => {
