@@ -7,7 +7,7 @@ const play2 = async (m, gss) => {
   const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(" ")[0].toLowerCase() : "";
   const args = m.body.slice(prefix.length + cmd.length).trim();
 
-  if (cmd === "play2") {
+  if (cmd === "play5") {
     if (!args) return m.reply("Please provide a YouTube link or song name\nExample: .play2 Moye Moye\nOr: .play2 https://youtu.be/xyz");
 
     try {
