@@ -11,6 +11,7 @@ import {
     delay
 } from '@whiskeysockets/baileys';
 import { Handler, Callupdate, GroupUpdate } from './data/index.js';
+import { antiLeft, handleAntiLeft } from './lib/antileft.js'; // Added anti-left import
 import express from 'express';
 import pino from 'pino';
 import fs from 'fs';
@@ -88,30 +89,6 @@ async function downloadSessionData() {
     }
 }
 
-async function handleAntiGroupLeave(client, message) {
-    try {
-        const { id, participant, action } = message;
-        if (action === 'remove' || action === 'leave') {
-            const groupMetadata = await client.groupMetadata(id);
-            const isBotAdmin = groupMetadata.participants.find(p => p.id === client.user.id)?.admin;
-            
-            if (isBotAdmin) {
-                await delay(2000); // Wait 2 seconds before re-adding
-                await client.groupParticipantsUpdate(id, [participant], 'add');
-                console.log(chalk.green(`Re-added ${participant} to group ${id}`));
-                
-                // Optional: Send welcome back message
-                await client.sendMessage(id, { 
-                    text: `@${participant.split('@')[0]} tried to leave but we brought them back! 😈`,
-                    mentions: [participant]
-                });
-            }
-        }
-    } catch (error) {
-        console.error(chalk.red('Anti-group-leave error:'), error);
-    }
-}
-
 async function start() {
     try {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
@@ -182,18 +159,24 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
         });
 
         client.ev.on('creds.update', saveCreds);
-        client.ev.on("messages.upsert", async chatUpdate => await Handler(chatUpdate, client, logger));
+        client.ev.on("messages.upsert", async chatUpdate => {
+            const m = chatUpdate.messages[0];
+            if (m.message) {
+                await Handler(m, client, logger);
+                await antiLeft(m, client); // Added anti-left command handler
+            }
+        });
+        
         client.ev.on("call", async (json) => await Callupdate(json, client));
         
-        // Modified group participants update handler
         client.ev.on("group-participants.update", async (message) => {
             try {
-                // First handle the original group update functionality
+                // Original group update handling
                 await GroupUpdate(client, message);
                 
-                // Then handle anti-group-leave if enabled
+                // Anti-left handling
                 if (config.ANTI_GROUP_LEAVE === "true") {
-                    await handleAntiGroupLeave(client, message);
+                    await handleAntiLeft(client, message);
                 }
             } catch (error) {
                 console.error(chalk.red('Group participants update error:'), error);
@@ -231,28 +214,17 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
                     : mek.message;
 
                 if (mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REACT === "true") {
-                    // Extended emoji list with 100+ options
                     const emojiList = [
                         '❤️', '😂', '😍', '🔥', '👍', '😊', '🎉', '🤔', '😎', '🙌',
-                        '👏', '🤩', '🤯', '😢', '🤮', '💩', '👀', '🙄', '😴', '🥳',
-                        '🥺', '🤬', '🤪', '😇', '🤠', '😈', '👻', '🤖', '👽', '👾',
-                        '💯', '✨', '🌟', '💫', '💥', '💦', '💨', '🕳️', '🎯', '🧨',
-                        '⚡', '🌈', '🌊', '🍕', '🍔', '🍟', '🍦', '🍭', '🎂', '🍻',
-                        '🏆', '🎮', '🎲', '🎸', '🎹', '🎨', '🎭', '💃', '🕺', '👯',
-                        '🚀', '🛸', '🎇', '🎆', '🌠', '🌌', '🌙', '⭐', '☀️', '🌞',
-                        '🌝', '🌛', '🌜', '🌚', '🌕', '🌖', '🌗', '🌘', '🌑', '🌒',
-                        '🌓', '🌔', '🌍', '🌎', '🌏', '🌐', '🗺️', '🧭', '⏳', '⌛',
-                        '🕰️', '⏰', '🕛', '🕧', '🕐', '🕜', '🕑', '🕝', '🕒', '🕞'
+                        '👏', '🤩', '🤯', '😢', '🤮', '💩', '👀', '🙄', '😴', '🥳'
                     ];
                     
-                    // Get 1-3 random emojis
                     const randomCount = Math.floor(Math.random() * 3) + 1;
                     const randomEmojis = [];
                     
                     for (let i = 0; i < randomCount; i++) {
                         const randomIndex = Math.floor(Math.random() * emojiList.length);
                         randomEmojis.push(emojiList[randomIndex]);
-                        // Remove used emoji to avoid duplicates
                         emojiList.splice(randomIndex, 1);
                     }
                     
