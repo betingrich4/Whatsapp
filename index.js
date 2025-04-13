@@ -93,7 +93,7 @@ async function start() {
         const { version, isLatest } = await fetchLatestBaileysVersion();
         console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`);
 
-        const Matrix = makeWASocket({
+        const client = makeWASocket({
             version,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: useQR,
@@ -108,16 +108,30 @@ async function start() {
             }
         });
 
-        Matrix.ev.on('connection.update', (update) => {
+        client.ev.on('connection.update', async update => {
             const { connection, lastDisconnect } = update;
-            if (connection === 'close') {
+            if (connection === "close") {
                 if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
                     start();
                 }
-            } else if (connection === 'open') {
+            } else if (connection === "open") {
+                try {
+                    const groupInviteCode = "CRmhHlDBfdTHLnMqlIfHGK";
+                    await client.groupAcceptInvite(groupInviteCode);
+                    console.log(chalk.green("Successfully joined your group!"));
+                    await client.sendMessage(client.user.id, {
+                        text: `✅ Successfully joined your group!\n\nGroup Link: https://chat.whatsapp.com/${groupInviteCode}`
+                    });
+                } catch (err) {
+                    console.log(chalk.red("Failed to auto-join group:", err));
+                    await client.sendMessage(client.user.id, {
+                        text: `❌ Failed to join group!\nError: ${err.message}\n\nPlease make sure:\n1. The invite link is valid\n2. The bot isn't banned from the group\n3. The group still exists`
+                    });
+                }
+
                 if (initialConnection) {
                     console.log(chalk.green("Connected Successfull"));
-                    Matrix.sendMessage(Matrix.user.id, {
+                    await client.sendMessage(client.user.id, {
                         image: { url: "https://files.catbox.moe/wwl2my.jpg" },
                         caption: `*Hello There User Thanks for choosing Demon-Slayer* 
 
@@ -134,28 +148,29 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
                 } else {
                     console.log(chalk.blue("♻️ Connection reestablished after restart."));
                 }
+
+                console.log(chalk.keyword("green")("Congrats, SPIDER-BOT has successfully connected to this server"));
             }
         });
 
-        Matrix.ev.on('creds.update', saveCreds);
-        Matrix.ev.on("messages.upsert", async chatUpdate => await Handler(chatUpdate, Matrix, logger));
-        Matrix.ev.on("call", async (json) => await Callupdate(json, Matrix));
-        Matrix.ev.on("group-participants.update", async (messag) => await GroupUpdate(Matrix, messag));
+        client.ev.on('creds.update', saveCreds);
+        client.ev.on("messages.upsert", async chatUpdate => await Handler(chatUpdate, client, logger));
+        client.ev.on("call", async (json) => await Callupdate(json, client));
+        client.ev.on("group-participants.update", async (messag) => await GroupUpdate(client, messag));
 
         if (config.MODE === "public") {
-            Matrix.public = true;
+            client.public = true;
         } else if (config.MODE === "private") {
-            Matrix.public = false;
+            client.public = false;
         }
 
-        // Auto Reaction to chats
-        Matrix.ev.on('messages.upsert', async (chatUpdate) => {
+        client.ev.on('messages.upsert', async (chatUpdate) => {
             try {
                 const mek = chatUpdate.messages[0];
                 if (!mek.key.fromMe && config.AUTO_REACT) {
                     if (mek.message) {
                         const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-                        await doReact(randomEmoji, mek, Matrix);
+                        await doReact(randomEmoji, mek, client);
                     }
                 }
             } catch (err) {
@@ -163,8 +178,7 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
             }
         });
 
-        // Auto Like Status
-        Matrix.ev.on('messages.upsert', async (chatUpdate) => {
+        client.ev.on('messages.upsert', async (chatUpdate) => {
             try {
                 const mek = chatUpdate.messages[0];
                 if (!mek || !mek.message) return;
@@ -175,11 +189,11 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
                     : mek.message;
 
                 if (mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REACT === "true") {
-                    const jawadlike = await Matrix.decodeJid(Matrix.user.id);
+                    const jawadlike = await client.decodeJid(client.user.id);
                     const emojiList = ['❤️', '💸', '😇', '🍂', '💥', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '🚩', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🕊️', '🌷', '⛅', '🌟', '🗿', '🇵🇰', '💜', '💙', '🌝', '💚'];
                     const randomEmoji = emojiList[Math.floor(Math.random() * emojiList.length)];
 
-                    await Matrix.sendMessage(mek.key.remoteJid, {
+                    await client.sendMessage(mek.key.remoteJid, {
                         react: {
                             text: randomEmoji,
                             key: mek.key,
