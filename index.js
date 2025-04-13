@@ -7,7 +7,8 @@ import {
     fetchLatestBaileysVersion,
     DisconnectReason,
     useMultiFileAuthState,
-    getContentType
+    getContentType,
+    delay
 } from '@whiskeysockets/baileys';
 import { Handler, Callupdate, GroupUpdate } from './data/index.js';
 import express from 'express';
@@ -87,6 +88,30 @@ async function downloadSessionData() {
     }
 }
 
+async function handleAntiGroupLeave(client, message) {
+    try {
+        const { id, participant, action } = message;
+        if (action === 'remove' || action === 'leave') {
+            const groupMetadata = await client.groupMetadata(id);
+            const isBotAdmin = groupMetadata.participants.find(p => p.id === client.user.id)?.admin;
+            
+            if (isBotAdmin) {
+                await delay(2000); // Wait 2 seconds before re-adding
+                await client.groupParticipantsUpdate(id, [participant], 'add');
+                console.log(chalk.green(`Re-added ${participant} to group ${id}`));
+                
+                // Optional: Send welcome back message
+                await client.sendMessage(id, { 
+                    text: `@${participant.split('@')[0]} tried to leave but we brought them back! 😈`,
+                    mentions: [participant]
+                });
+            }
+        }
+    } catch (error) {
+        console.error(chalk.red('Anti-group-leave error:'), error);
+    }
+}
+
 async function start() {
     try {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
@@ -105,7 +130,8 @@ async function start() {
                     return msg.message || undefined;
                 }
                 return { conversation: "whatsapp user bot" };
-            }
+            },
+            msgRetryCounterCache
         });
 
         client.ev.on('connection.update', async update => {
@@ -158,7 +184,21 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
         client.ev.on('creds.update', saveCreds);
         client.ev.on("messages.upsert", async chatUpdate => await Handler(chatUpdate, client, logger));
         client.ev.on("call", async (json) => await Callupdate(json, client));
-        client.ev.on("group-participants.update", async (messag) => await GroupUpdate(client, messag));
+        
+        // Modified group participants update handler
+        client.ev.on("group-participants.update", async (message) => {
+            try {
+                // First handle the original group update functionality
+                await GroupUpdate(client, message);
+                
+                // Then handle anti-group-leave if enabled
+                if (config.ANTI_GROUP_LEAVE === "true") {
+                    await handleAntiGroupLeave(client, message);
+                }
+            } catch (error) {
+                console.error(chalk.red('Group participants update error:'), error);
+            }
+        });
 
         if (config.MODE === "public") {
             client.public = true;
@@ -191,21 +231,38 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
                     : mek.message;
 
                 if (mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REACT === "true") {
-                    const jawadlike = await client.decodeJid(client.user.id);
-                    const emojiList = ['❤️', '💸', '😇', '🍂', '💥', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '🚩', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🕊️', '🌷', '⛅', '🌟', '🗿', '🇵🇰', '💜', '💙', '🌝', '💚'];
-                    const randomEmoji = emojiList[Math.floor(Math.random() * emojiList.length)];
-
-                    await client.sendMessage(mek.key.remoteJid, {
-                        react: {
-                            text: randomEmoji,
-                            key: mek.key,
-                        }
-                    }, { statusJidList: [mek.key.participant, jawadlike] });
-
-                    console.log(`Auto-reacted to a status with: ${randomEmoji}`);
+                    // Extended emoji list with 100+ options
+                    const emojiList = [
+                        '❤️', '😂', '😍', '🔥', '👍', '😊', '🎉', '🤔', '😎', '🙌',
+                        '👏', '🤩', '🤯', '😢', '🤮', '💩', '👀', '🙄', '😴', '🥳',
+                        '🥺', '🤬', '🤪', '😇', '🤠', '😈', '👻', '🤖', '👽', '👾',
+                        '💯', '✨', '🌟', '💫', '💥', '💦', '💨', '🕳️', '🎯', '🧨',
+                        '⚡', '🌈', '🌊', '🍕', '🍔', '🍟', '🍦', '🍭', '🎂', '🍻',
+                        '🏆', '🎮', '🎲', '🎸', '🎹', '🎨', '🎭', '💃', '🕺', '👯',
+                        '🚀', '🛸', '🎇', '🎆', '🌠', '🌌', '🌙', '⭐', '☀️', '🌞',
+                        '🌝', '🌛', '🌜', '🌚', '🌕', '🌖', '🌗', '🌘', '🌑', '🌒',
+                        '🌓', '🌔', '🌍', '🌎', '🌏', '🌐', '🗺️', '🧭', '⏳', '⌛',
+                        '🕰️', '⏰', '🕛', '🕧', '🕐', '🕜', '🕑', '🕝', '🕒', '🕞'
+                    ];
+                    
+                    // Get 1-3 random emojis
+                    const randomCount = Math.floor(Math.random() * 3) + 1;
+                    const randomEmojis = [];
+                    
+                    for (let i = 0; i < randomCount; i++) {
+                        const randomIndex = Math.floor(Math.random() * emojiList.length);
+                        randomEmojis.push(emojiList[randomIndex]);
+                        // Remove used emoji to avoid duplicates
+                        emojiList.splice(randomIndex, 1);
+                    }
+                    
+                    const reactionText = randomEmojis.join('');
+                    
+                    await client.sendReaction(mek.key.remoteJid, reactionText, mek.key);
+                    console.log(chalk.blue(`Reacted to status with: ${reactionText}`));
                 }
             } catch (err) {
-                console.error("Auto Like Status Error:", err);
+                console.error(chalk.red("Auto Like Status Error:"), err);
             }
         });
 
