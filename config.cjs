@@ -17,6 +17,7 @@ const config = {
   AUTOLIKE_STATUS: process.env.AUTOLIKE_STATUS !== undefined ? process.env.AUTOLIKE_STATUS === 'true' : true,
   /*anti left by joel xd tech*/
   ANTI_LEFT: process.env.ANTI_LEFT !== undefined ? process.env.ANTI_LEFT === 'true' : true,
+  ANTI_GROUP_LEAVE: "true", // Set to "false" to disable
   AUTOLIKE_EMOJI: process.env.AUTOLIKE_EMOJI || '🐥', // For liking status updates(stories)
   AUTO_REPLY_STATUS: process.env.AUTO_REPLY_STATUS !== undefined ? process.env.AUTO_REPLY_STATUS === 'true' : false,
   STATUS_READ_MSG: process.env.STATUS_READ_MSG || 'Status Viewed',
