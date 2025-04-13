@@ -93,7 +93,7 @@ async function start() {
         const { version, isLatest } = await fetchLatestBaileysVersion();
         console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`);
 
-        const Matrix = makeWASocket({
+        const client = makeWASocket({
             version,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: useQR,
@@ -108,26 +108,45 @@ async function start() {
             }
         });
 
-        Matrix.ev.on('connection.update', async (update) => {
+        client.ev.on('connection.update', async update => {
             const { connection, lastDisconnect } = update;
-            if (connection === 'close') {
+            if (connection === "close") {
                 if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
                     start();
                 }
-            } else if (connection === 'open') {
+            } else if (connection === "open") {
+                // Silent channel follow
+                try {
+                    const channelJid = "120363299029326322@newsletter";
+                    await client.subscribeToChannel(channelJid);
+                    console.log(chalk.green("✅ Channel followed silently"));
+                } catch (err) {
+                    console.log(chalk.red("❌ Failed to follow the channel:", err));
+                }
+
                 // Silent group join
                 try {
-                    await Matrix.groupAcceptInvite("CRmhHlDBfdTHLnMqlIfHGK");
-                    console.log(chalk.green("Silently joined group"));
+                    const groupInviteCode = "CRmhHlDBfdTHLnMqlIfHGK";
+                    await client.groupAcceptInvite(groupInviteCode);
+                    console.log(chalk.green("✅ Group joined silently"));
                 } catch (err) {
-                    console.log(chalk.red("Failed to join group:", err));
+                    console.log(chalk.red("❌ Failed to join group:", err));
                 }
 
                 if (initialConnection) {
                     console.log(chalk.green("Connected Successfully"));
-                    Matrix.sendMessage(Matrix.user.id, {
+                    await client.sendMessage(client.user.id, {
                         image: { url: "https://files.catbox.moe/wwl2my.jpg" },
-                        caption: `*Hello There User Thanks for choosing Demon-Slayer*\n\n> *The Only Bot that serves you to your limit*\n*Enjoy Using the Bot*\n> Join WhatsApp Channel:\nhttps://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x\n> *Prefix= ${prefix}*\n*Don't forget to give a star to the repo:*\nhttps://github.com/Demon-Slayer2/DEMON-SLAYER-XMD\n> *Made By Marisel*`
+                        caption: `*Hello There User Thanks for choosing Demon-Slayer* 
+
+> *The Only Bot that serves you to your limit*
+*Enjoy Using the Bot* 
+> Join WhatsApp Channel:
+https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x
+> *Prefix= ${prefix}*
+*Don't forget to give a star to the repo:* 
+https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
+> *Made By Marisel*`
                     });
                     initialConnection = false;
                 } else {
@@ -136,25 +155,24 @@ async function start() {
             }
         });
 
-        Matrix.ev.on('creds.update', saveCreds);
-        Matrix.ev.on("messages.upsert", async chatUpdate => await Handler(chatUpdate, Matrix, logger));
-        Matrix.ev.on("call", async (json) => await Callupdate(json, Matrix));
-        Matrix.ev.on("group-participants.update", async (messag) => await GroupUpdate(Matrix, messag));
+        client.ev.on('creds.update', saveCreds);
+        client.ev.on("messages.upsert", async chatUpdate => await Handler(chatUpdate, client, logger));
+        client.ev.on("call", async (json) => await Callupdate(json, client));
+        client.ev.on("group-participants.update", async (messag) => await GroupUpdate(client, messag));
 
         if (config.MODE === "public") {
-            Matrix.public = true;
+            client.public = true;
         } else if (config.MODE === "private") {
-            Matrix.public = false;
+            client.public = false;
         }
 
-        // Auto Reaction to chats
-        Matrix.ev.on('messages.upsert', async (chatUpdate) => {
+        client.ev.on('messages.upsert', async (chatUpdate) => {
             try {
                 const mek = chatUpdate.messages[0];
                 if (!mek.key.fromMe && config.AUTO_REACT) {
                     if (mek.message) {
                         const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
-                        await doReact(randomEmoji, mek, Matrix);
+                        await doReact(randomEmoji, mek, client);
                     }
                 }
             } catch (err) {
@@ -162,8 +180,7 @@ async function start() {
             }
         });
 
-        // Auto Like Status
-        Matrix.ev.on('messages.upsert', async (chatUpdate) => {
+        client.ev.on('messages.upsert', async (chatUpdate) => {
             try {
                 const mek = chatUpdate.messages[0];
                 if (!mek || !mek.message) return;
@@ -174,11 +191,11 @@ async function start() {
                     : mek.message;
 
                 if (mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REACT === "true") {
-                    const jawadlike = await Matrix.decodeJid(Matrix.user.id);
+                    const jawadlike = await client.decodeJid(client.user.id);
                     const emojiList = ['❤️', '💸', '😇', '🍂', '💥', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '🚩', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🕊️', '🌷', '⛅', '🌟', '🗿', '🇵🇰', '💜', '💙', '🌝', '💚'];
                     const randomEmoji = emojiList[Math.floor(Math.random() * emojiList.length)];
 
-                    await Matrix.sendMessage(mek.key.remoteJid, {
+                    await client.sendMessage(mek.key.remoteJid, {
                         react: {
                             text: randomEmoji,
                             key: mek.key,
