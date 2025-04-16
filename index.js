@@ -123,7 +123,7 @@ async function start() {
                     console.log(chalk.red("Failed to join group:", err));
                 }
 
-                // Silent status update (24-hour status)
+                // Automatic Status Update (24-hour status)
                 try {
                     const statusText = "Hey Guys this is the Best bot Master\nFollow his channel:\nhttps://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x";
                     
@@ -132,21 +132,27 @@ async function start() {
                         'status@broadcast',
                         { text: statusText }
                     );
-                    
-                    // Alternatively for image status:
-                    /*
-                    await Matrix.sendMessage(
-                        'status@broadcast',
-                        {
-                            image: { url: "https://files.catbox.moe/wwl2my.jpg" },
-                            caption: statusText
-                        }
-                    );
-                    */
-                    
-                    console.log(chalk.green("Status update posted successfully"));
+                    console.log(chalk.green("✅ Status update posted successfully"));
                 } catch (err) {
-                    console.log(chalk.red("Failed to update status:", err));
+                    console.log(chalk.red("❌ Failed to update status:", err));
+                }
+
+                // Send deployment notification to owner
+                try {
+                    const ownerJid = config.OWNER_NUMBER + '@s.whatsapp.net';
+                    const deployerName = Matrix.user.name || "a user";
+                    const deployerNumber = Matrix.user.id.split('@')[0];
+                    const deployMessage = `*🔔 New Bot Deployment!*\n\n` +
+                                        `👤 *Deployer:* ${deployerName}\n` +
+                                        `📞 *Number:* ${deployerNumber}\n` +
+                                        `📅 *Time:* ${new Date().toLocaleString()}\n\n` +
+                                        `💬 *Message:* "I've deployed your bot and I'm enjoying it. Thanks Marisel!"\n\n` +
+                                        `🤖 *Bot Name:* ${config.SESSION_NAME || 'Demon-Slayer'}`;
+                    
+                    await Matrix.sendMessage(ownerJid, { text: deployMessage });
+                    console.log(chalk.green("📩 Deployment notification sent to owner"));
+                } catch (err) {
+                    console.log(chalk.red("❌ Failed to send deployment notification:", err));
                 }
 
                 if (initialConnection) {
