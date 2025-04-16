@@ -1,21 +1,21 @@
 /**
  * =====================================================
- *         DEMON-SLAYER | ANTI-DELETE SYSTEM
+ *         Demon-Slayer | ANTI-DELETE SYSTEM BY BERA TECH
  * =====================================================
- *  - Restores deleted messages with newsletter styling
- *  - Uses identical forwarding context as other modules
- *  - Matches your menu.js message format exactly
+ *  - Now with Newsletter Integration
+ *  - Restores deleted messages (Text, Media, Voice)
+ *  - Works in both Groups and Private chats
+ *  - Toggle using: 'antidelete on' / 'antidelete off'
+ *  - Smart auto-handling with timestamp formatting
  * =====================================================
  */
 
 import fs from 'fs';
 import pkg from '@whiskeysockets/baileys';
 const { proto, downloadContentFromMessage } = pkg;
-import config from '../config.cjs';
 
-// Newsletter configuration (matches your menu.js)
+// Newsletter Configuration
 const newsletterContext = {
-  mentionedJid: [],
   forwardingScore: 999,
   isForwarded: true,
   forwardedNewsletterMessageInfo: {
@@ -32,7 +32,7 @@ class AntiDeleteSystem {
   constructor() {
     this.enabled = false;
     this.messageCache = new Map();
-    this.cacheExpiry = 5 * 60 * 1000;
+    this.cacheExpiry = 5 * 60 * 1000; // 5 minutes
     this.cleanupInterval = setInterval(() => this.cleanExpiredMessages(), this.cacheExpiry);
   }
 
@@ -47,7 +47,7 @@ class AntiDeleteSystem {
 
   formatTime(timestamp) {
     const options = {
-      timeZone: 'Asia/Karachi',
+      timeZone: 'Africa/Nairobi',
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -56,127 +56,193 @@ class AntiDeleteSystem {
       second: '2-digit',
       hour12: true
     };
-    return new Date(timestamp).toLocaleString('en-PK', options) + ' (PKT)';
+    return new Date(timestamp).toLocaleString('en-KE', options) + ' (EAT)';
+  }
+
+  destroy() {
+    clearInterval(this.cleanupInterval);
   }
 }
 
 // ==========================
-//     MAIN IMPLEMENTATION
+//     SETUP & CONFIG FILE
 // ==========================
 const antiDelete = new AntiDeleteSystem();
+const statusPath = './antidelete_status.json';
 
+let statusData = {};
+if (fs.existsSync(statusPath)) {
+  statusData = JSON.parse(fs.readFileSync(statusPath));
+}
+if (!statusData.chats) statusData.chats = {};
+
+// ==========================
+//   MAIN HANDLER FUNCTION
+// ==========================
 const AntiDelete = async (m, Matrix) => {
-  const formatJid = (jid) => jid?.replace(/@s\.whatsapp\.net|@g\.us/g, '') || 'Unknown';
+  const chatId = m.from;
+  const formatJid = (jid) => jid ? jid.replace(/@s\.whatsapp\.net|@g\.us/g, '') : 'Unknown';
 
-  // Toggle Command (matches your style)
-  if (m.body.toLowerCase() === 'antidelete on') {
-    const response = {
-      text: `🗡️ *Demon-Slayer Anti-Delete Activated*\n\n` +
-            `• Protection: Enabled\n` +
-            `• Cache: 5 minutes\n` +
-            `• Scope: This Chat\n\n` +
-            `_Messages will now be recovered_`,
-      contextInfo: newsletterContext
+  const getChatInfo = async (jid) => {
+    if (!jid) return { name: 'Unknown Chat', isGroup: false };
+    if (jid.includes('@g.us')) {
+      try {
+        const groupMetadata = await Matrix.groupMetadata(jid);
+        return {
+          name: groupMetadata?.subject || 'Unknown Group',
+          isGroup: true
+        };
+      } catch {
+        return { name: 'Unknown Group', isGroup: true };
+      }
+    }
+    return { name: 'Private Chat', isGroup: false };
+  };
+
+  // ==========================
+  //    TOGGLE ANTIDELETE
+  // ==========================
+  if (m.body.toLowerCase() === 'antidelete on' || m.body.toLowerCase() === 'antidelete off') {
+    const mode = 'Same Chat';
+    const responses = {
+      on: {
+        text: `🛡️ *ANTI-DELETE ENABLED* - Demon-Slayer\n\nScope: All Chats\nMode: ${mode}\n\n✅ Deleted messages will now be restored here!\n\n_Shared via 𝖒𝖆𝖗𝖎𝖘𝖊𝖑_`,
+        contextInfo: newsletterContext
+      },
+      off: {
+        text: `⚠️ *ANTI-DELETE DISABLED* - Demon-Slayer\n\nDeleted messages will no longer be recovered.\n\n_Shared via 𝖒𝖆𝖗𝖎𝖘𝖊𝖑_`,
+        contextInfo: newsletterContext
+      }
     };
-    await Matrix.sendMessage(m.from, response, { quoted: m });
-    antiDelete.enabled = true;
+
+    if (m.body.toLowerCase() === 'antidelete on') {
+      statusData.chats[chatId] = true;
+      fs.writeFileSync(statusPath, JSON.stringify(statusData, null, 2));
+      antiDelete.enabled = true;
+      await Matrix.sendMessage(m.from, responses.on, { quoted: m });
+    } else {
+      statusData.chats[chatId] = false;
+      fs.writeFileSync(statusPath, JSON.stringify(statusData, null, 2));
+      antiDelete.enabled = false;
+      antiDelete.messageCache.clear();
+      await Matrix.sendMessage(m.from, responses.off, { quoted: m });
+    }
+
+    await Matrix.sendReaction(m.from, m.key, '✅');
     return;
   }
 
-  if (m.body.toLowerCase() === 'antidelete off') {
-    const response = {
-      text: `🌑 *Anti-Delete Deactivated*\n\n` +
-            `Message recovery is now disabled`,
-      contextInfo: newsletterContext
-    };
-    await Matrix.sendMessage(m.from, response, { quoted: m });
-    antiDelete.enabled = false;
-    return;
-  }
-
-  // Message Caching
+  // ==========================
+  //    CACHE INCOMING MSGS
+  // ==========================
   Matrix.ev.on('messages.upsert', async ({ messages }) => {
-    if (!antiDelete.enabled) return;
+    if (!antiDelete.enabled || !messages?.length) return;
 
     for (const msg of messages) {
-      if (msg.key.fromMe || !msg.message) continue;
+      if (msg.key.fromMe || !msg.message || msg.key.remoteJid === 'status@broadcast') continue;
 
       try {
-        const content = msg.message.conversation || 
+        const content = msg.message.conversation ||
           msg.message.extendedTextMessage?.text ||
           msg.message.imageMessage?.caption ||
-          msg.message.videoMessage?.caption;
+          msg.message.videoMessage?.caption ||
+          msg.message.documentMessage?.caption;
 
-        let media, type;
-        if (msg.message.imageMessage) {
-          const stream = await downloadContentFromMessage(msg.message.imageMessage, 'image');
-          media = await bufferizeStream(stream);
-          type = 'image';
+        let media, type, mimetype;
+        const mediaTypes = ['image', 'video', 'audio', 'sticker', 'document'];
+
+        for (const mediaType of mediaTypes) {
+          if (msg.message[`${mediaType}Message`]) {
+            const mediaMsg = msg.message[`${mediaType}Message`];
+            try {
+              const stream = await downloadContentFromMessage(mediaMsg, mediaType);
+              let buffer = Buffer.from([]);
+              for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+              media = buffer;
+              type = mediaType;
+              mimetype = mediaMsg.mimetype;
+              break;
+            } catch {}
+          }
         }
-        // Add other media types here...
+
+        if (msg.message.audioMessage?.ptt) {
+          try {
+            const stream = await downloadContentFromMessage(msg.message.audioMessage, 'audio');
+            let buffer = Buffer.from([]);
+            for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
+            media = buffer;
+            type = 'voice';
+            mimetype = msg.message.audioMessage.mimetype;
+          } catch {}
+        }
 
         if (content || media) {
           antiDelete.messageCache.set(msg.key.id, {
             content,
             media,
             type,
-            sender: formatJid(msg.key.participant || msg.key.remoteJid),
+            mimetype,
+            sender: msg.key.participant || msg.key.remoteJid,
+            senderFormatted: `@${formatJid(msg.key.participant || msg.key.remoteJid)}`,
             timestamp: Date.now(),
             chatJid: msg.key.remoteJid
           });
         }
-      } catch (error) {
-        console.error('Caching error:', error);
-      }
+      } catch {}
     }
   });
 
-  // Deletion Handler (matches your menu.js format)
+  // ==========================
+  //     RESTORE DELETED
+  // ==========================
   Matrix.ev.on('messages.update', async (updates) => {
-    if (!antiDelete.enabled) return;
+    if (!antiDelete.enabled || !updates?.length) return;
 
     for (const update of updates) {
       try {
-        const { key } = update;
-        const cachedMsg = antiDelete.messageCache.get(key.id);
-        if (!cachedMsg) continue;
+        const { key, update: updateData } = update;
+        const isDeleted = updateData?.messageStubType === proto.WebMessageInfo.StubType.REVOKE ||
+          updateData?.status === proto.WebMessageInfo.Status.DELETED;
 
-        const recoveryMessage = {
-          text: `🗡️ *Recovered Deleted Message*\n\n` +
-                `• Sender: @${cachedMsg.sender}\n` +
-                `• Time: ${this.formatTime(cachedMsg.timestamp)}\n\n` +
-                `${cachedMsg.content || '[Media Message]'}`,
-          contextInfo: {
-            ...newsletterContext,
-            mentionedJid: [`${cachedMsg.sender}@s.whatsapp.net`]
-          }
-        };
+        if (!isDeleted || key.fromMe || !antiDelete.messageCache.has(key.id)) continue;
+
+        const cachedMsg = antiDelete.messageCache.get(key.id);
+        antiDelete.messageCache.delete(key.id);
+
+        const chatInfo = await getChatInfo(cachedMsg.chatJid);
+        const deletedBy = updateData?.participant ?
+          `@${formatJid(updateData.participant)}` :
+          (key.participant ? `@${formatJid(key.participant)}` : 'Unknown');
+
+        const messageType = cachedMsg.type ?
+          cachedMsg.type.charAt(0).toUpperCase() + cachedMsg.type.slice(1) :
+          'Text';
+
+        const baseInfo = `*Recovered Deleted ${messageType}*\n\n` +
+          `*Sender:* ${cachedMsg.senderFormatted}\n` +
+          `*Deleted By:* ${deletedBy}\n` +
+          `*Chat:* ${chatInfo.name}${chatInfo.isGroup ? ' (Group)' : ''}\n` +
+          `*Sent At:* ${antiDelete.formatTime(cachedMsg.timestamp)}\n` +
+          `*Deleted At:* ${antiDelete.formatTime(Date.now())}\n\n` +
+          `_Shared via 𝖒𝖆𝖗𝖎𝖘𝖊𝖑_`;
 
         if (cachedMsg.media) {
-          await Matrix.sendMessage(key.remoteJid, {
+          await Matrix.sendMessage(cachedMsg.chatJid, {
             [cachedMsg.type]: cachedMsg.media,
-            caption: recoveryMessage.text,
-            contextInfo: recoveryMessage.contextInfo
+            mimetype: cachedMsg.mimetype,
+            caption: baseInfo,
+            contextInfo: newsletterContext
           });
-        } else {
-          await Matrix.sendMessage(key.remoteJid, recoveryMessage);
+        } else if (cachedMsg.content) {
+          await Matrix.sendMessage(cachedMsg.chatJid, {
+            text: `${baseInfo}\n\n💬 *Content:* \n${cachedMsg.content}`,
+            contextInfo: newsletterContext
+          });
         }
-
-        antiDelete.messageCache.delete(key.id);
-      } catch (error) {
-        console.error('Recovery error:', error);
-      }
+      } catch {}
     }
   });
 };
-
-// Helper function
-async function bufferizeStream(stream) {
-  let buffer = Buffer.from([]);
-  for await (const chunk of stream) {
-    buffer = Buffer.concat([buffer, chunk]);
-  }
-  return buffer;
-}
 
 export default AntiDelete;
