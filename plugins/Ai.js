@@ -6,6 +6,8 @@ import config from '../../config.cjs';
 const __filename = new URL(import.meta.url).pathname;
 const __dirname = path.dirname(__filename);
 const chatHistoryFile = path.resolve(__dirname, '../deepseek_history.json');
+const newsletterJid = config.CHANNEL_JID || '120363299029326322@newsletter';
+const newsletterName = config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑";
 
 const deepSeekSystemPrompt = "You are an intelligent AI assistant.";
 
@@ -48,7 +50,18 @@ const deepseek = async (m, Matrix) => {
 
     if (text === "/forget") {
         await deleteChatHistory(chatHistory, m.sender);
-        await Matrix.sendMessage(m.from, { text: 'Conversation deleted successfully' }, { quoted: m });
+        await Matrix.sendMessage(m.from, { 
+            text: 'Conversation history deleted successfully',
+            contextInfo: {
+                forwardingScore: 999,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: newsletterJid,
+                    newsletterName: newsletterName,
+                    serverMessageId: 143
+                }
+            }
+        }, { quoted: m });
         return;
     }
 
@@ -60,7 +73,18 @@ const deepseek = async (m, Matrix) => {
 
     if (validCommands.includes(cmd)) {
         if (!prompt) {
-            await Matrix.sendMessage(m.from, { text: 'Please give me a prompt' }, { quoted: m });
+            await Matrix.sendMessage(m.from, { 
+                text: 'Please provide a prompt/question after the command',
+                contextInfo: {
+                    forwardingScore: 999,
+                    isForwarded: true,
+                    forwardedNewsletterMessageInfo: {
+                        newsletterJid: newsletterJid,
+                        newsletterName: newsletterName,
+                        serverMessageId: 143
+                    }
+                }
+            }, { quoted: m });
             return;
         }
 
@@ -78,11 +102,11 @@ const deepseek = async (m, Matrix) => {
             const response = await fetch(apiUrl);
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(`API error! status: ${response.status}`);
             }
 
             const responseData = await response.json();
-            const answer = responseData.message;
+            let answer = responseData.message;
 
             await updateChatHistory(chatHistory, m.sender, { role: "user", content: prompt });
             await updateChatHistory(chatHistory, m.sender, { role: "assistant", content: answer });
@@ -91,16 +115,48 @@ const deepseek = async (m, Matrix) => {
 
             if (codeMatch) {
                 const code = codeMatch[1];
-
-                await Matrix.sendMessage(m.from, { text: `🔹 *Here's your code snippet:* \n\n\`\`\`${code}\`\`\`` }, { quoted: m });
+                await Matrix.sendMessage(m.from, { 
+                    text: `🔹 *Code Response* 🔹\n\n\`\`\`${code}\`\`\``,
+                    contextInfo: {
+                        forwardingScore: 999,
+                        isForwarded: true,
+                        forwardedNewsletterMessageInfo: {
+                            newsletterJid: newsletterJid,
+                            newsletterName: newsletterName,
+                            serverMessageId: 143
+                        }
+                    }
+                }, { quoted: m });
             } else {
-                await Matrix.sendMessage(m.from, { text: answer }, { quoted: m });
+                await Matrix.sendMessage(m.from, { 
+                    text: answer,
+                    contextInfo: {
+                        forwardingScore: 999,
+                        isForwarded: true,
+                        forwardedNewsletterMessageInfo: {
+                            newsletterJid: newsletterJid,
+                            newsletterName: newsletterName,
+                            serverMessageId: 143
+                        }
+                    }
+                }, { quoted: m });
             }
 
             await m.React("✅");
         } catch (err) {
-            await Matrix.sendMessage(m.from, { text: "Something went wrong, please try again." }, { quoted: m });
-            console.error('Error fetching response from DeepSeek API:', err);
+            await Matrix.sendMessage(m.from, { 
+                text: "⚠️ Error processing your request. Please try again later.",
+                contextInfo: {
+                    forwardingScore: 999,
+                    isForwarded: true,
+                    forwardedNewsletterMessageInfo: {
+                        newsletterJid: newsletterJid,
+                        newsletterName: newsletterName,
+                        serverMessageId: 143
+                    }
+                }
+            }, { quoted: m });
+            console.error('DeepSeek API Error:', err);
             await m.React("❌");
         }
     }
