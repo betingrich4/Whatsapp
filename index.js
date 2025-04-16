@@ -291,7 +291,7 @@ async function init() {
 init();
 
 app.get('index.html', (req, res) => {
-    res.redirect('https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD');
+    res.redirect('https://in-kappa.vercel.app/');
 });
 
 app.listen(PORT, () => {
