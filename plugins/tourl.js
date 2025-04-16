@@ -2,12 +2,8 @@ import fetch from 'node-fetch';
 import FormData from 'form-data';
 import { fileTypeFromBuffer } from 'file-type';
 import { writeFile, unlink } from 'fs/promises';
-import config from '../config.cjs';
 
 const MAX_FILE_SIZE_MB = 200;
-const newsletterJid = config.CHANNEL_JID || '120363299029326322@newsletter';
-const newsletterName = config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑";
-
 async function uploadMedia(buffer) {
   try {
     const { ext } = await fileTypeFromBuffer(buffer);
@@ -40,18 +36,7 @@ const tourl = async (m, bot) => {
 
   if (validCommands.includes(cmd)) {
     if (!m.quoted || !['imageMessage', 'videoMessage', 'audioMessage'].includes(m.quoted.mtype)) {
-      return m.reply({
-        text: `Send/Reply/Quote an image, video, or audio to upload \n*${prefix + cmd}*`,
-        contextInfo: {
-          forwardingScore: 999,
-          isForwarded: true,
-          forwardedNewsletterMessageInfo: {
-            newsletterJid: newsletterJid,
-            newsletterName: newsletterName,
-            serverMessageId: 143
-          }
-        }
-      });
+      return m.reply(`Send/Reply/Quote an image, video, or audio to upload \n*${prefix + cmd}*`);
     }
 
     try {
@@ -69,33 +54,11 @@ const tourl = async (m, bot) => {
       const loadingMessageCount = loadingMessages.length;
       let currentMessageIndex = 0;
 
-      const { key } = await bot.sendMessage(m.from, { 
-        text: loadingMessages[currentMessageIndex],
-        contextInfo: {
-          forwardingScore: 999,
-          isForwarded: true,
-          forwardedNewsletterMessageInfo: {
-            newsletterJid: newsletterJid,
-            newsletterName: newsletterName,
-            serverMessageId: 143
-          }
-        }
-      }, { quoted: m });
+      const { key } = await bot.sendMessage(m.from, { text: loadingMessages[currentMessageIndex] }, { quoted: m });
 
       const loadingInterval = setInterval(() => {
         currentMessageIndex = (currentMessageIndex + 1) % loadingMessageCount;
-        bot.sendMessage(m.from, { 
-          text: loadingMessages[currentMessageIndex],
-          contextInfo: {
-            forwardingScore: 999,
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-              newsletterJid: newsletterJid,
-              newsletterName: newsletterName,
-              serverMessageId: 143
-            }
-          }
-        }, { quoted: m, messageId: key });
+        bot.sendMessage(m.from, { text: loadingMessages[currentMessageIndex] }, { quoted: m, messageId: key });
       }, 500);
 
       const media = await m.quoted.download();
@@ -104,74 +67,30 @@ const tourl = async (m, bot) => {
       const fileSizeMB = media.length / (1024 * 1024);
       if (fileSizeMB > MAX_FILE_SIZE_MB) {
         clearInterval(loadingInterval);
-        return m.reply({
-          text: `File size exceeds the limit of ${MAX_FILE_SIZE_MB}MB.`,
-          contextInfo: {
-            forwardingScore: 999,
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-              newsletterJid: newsletterJid,
-              newsletterName: newsletterName,
-              serverMessageId: 143
-            }
-          }
-        });
+        return m.reply(`File size exceeds the limit of ${MAX_FILE_SIZE_MB}MB.`);
       }
-
       const mediaUrl = await uploadMedia(media);
+
       clearInterval(loadingInterval);
-      
-      await bot.sendMessage(m.from, { 
-        text: '✅ Upload complete!',
-        contextInfo: {
-          forwardingScore: 999,
-          isForwarded: true,
-          forwardedNewsletterMessageInfo: {
-            newsletterJid: newsletterJid,
-            newsletterName: newsletterName,
-            serverMessageId: 143
-          }
-        }
-      }, { quoted: m });
+      await bot.sendMessage(m.from, { text: '✅ Loading complete.' }, { quoted: m });
 
       const mediaType = getMediaType(m.quoted.mtype);
-      const commonContext = {
-        forwardingScore: 999,
-        isForwarded: true,
-        forwardedNewsletterMessageInfo: {
-          newsletterJid: newsletterJid,
-          newsletterName: newsletterName,
-          serverMessageId: 143
-        }
-      };
-
       if (mediaType === 'audio') {
-        await bot.sendMessage(m.from, { 
-          text: `*Media Upload Successful*\n\n🔹 *Type:* Audio\n🔹 *URL:* ${mediaUrl}\n\n_Shared via ${newsletterName}_`,
-          contextInfo: commonContext
-        }, { quoted: m });
+        const message = {
+          text: `*Hey ${m.pushName} Here Is Your Audio URL*\n*Url:* ${mediaUrl}`,
+        };
+        await bot.sendMessage(m.from, message, { quoted: m });
       } else {
-        await bot.sendMessage(m.from, { 
+        const message = {
           [mediaType]: { url: mediaUrl },
-          caption: `*Media Upload Successful*\n\n🔹 *Type:* ${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)}\n🔹 *URL:* ${mediaUrl}\n\n_Shared via ${newsletterName}_`,
-          contextInfo: commonContext
-        }, { quoted: m });
+          caption: `*Hey ${m.pushName} Here Is Your Media*\n*Url:* ${mediaUrl}`,
+        };
+        await bot.sendMessage(m.from, message, { quoted: m });
       }
 
     } catch (error) {
       console.error('Error processing media:', error);
-      await bot.sendMessage(m.from, { 
-        text: '⚠️ Error processing media. Please try again.',
-        contextInfo: {
-          forwardingScore: 999,
-          isForwarded: true,
-          forwardedNewsletterMessageInfo: {
-            newsletterJid: newsletterJid,
-            newsletterName: newsletterName,
-            serverMessageId: 143
-          }
-        }
-      }, { quoted: m });
+      m.reply('Error processing media.');
     }
   }
 };
