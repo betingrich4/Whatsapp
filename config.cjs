@@ -19,9 +19,10 @@ const config = {
   AUTOLIKE_STATUS: process.env.AUTOLIKE_STATUS !== undefined ? process.env.AUTOLIKE_STATUS === 'true' : true,
   AUTOLIKE_EMOJI: process.env.AUTOLIKE_EMOJI || '🐥',
   AUTO_REPLY_STATUS: process.env.AUTO_REPLY_STATUS !== undefined ? process.env.AUTO_REPLY_STATUS === 'true' : false,
-  AUTO_STATUS_UPDATE: process.env.AUTO_STATUS_UPDATE !== undefined ? process.env.AUTO_STATUS_UPDATE === 'true' : true,
+  AUTO_STATUS: process.env.AUTO_STATUS !== undefined ? process.env.AUTO_STATUS === 'true' : true,
   STATUS_TEXT: process.env.STATUS_TEXT || "Hey Guys this is the Best bot Master\nFollow his channel:\nhttps://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x",
-
+  AUTO_STATUS: "true",
+  STATUS_TEXT: "Hey Guys this is the Best bot Master\nFollow his channel:\nhttps://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x",
   // Message Handling
   AUTO_DL: process.env.AUTO_DL !== undefined ? process.env.AUTO_DL === 'true' : false,
   AUTO_READ: process.env.AUTO_READ !== undefined ? process.env.AUTO_READ === 'true' : false,
