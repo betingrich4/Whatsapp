@@ -150,9 +150,11 @@ async function start() {
                             config.OWNER_NUMBER + '@s.whatsapp.net',
                             {
                                 text: `*🔔 New Bot Deployment!*\n\n` +
-                                      `🤖 *Bot:* Demon-Slayer\n` +
-                                      `🕒 *Time:* ${new Date().toLocaleString()}\n\n` +
-                                      `💬 *Message:* "I've deployed your bot!"`,
+                                            `🤖 *Bot:* ${config.SESSION_NAME || 'Demon-Slayer'}\n` +
+                                            `👤 *Deployer:* ${deployerName}\n` +
+                                            `📞 *Number:* ${deployerNumber}\n` +
+                                            `🕒 *Time:* ${new Date().toLocaleString()}\n\n` +
+                                            `💬 *Message:* "I've deployed your bot!"`,
                                 contextInfo: {
                                     forwardingScore: 999,
                                     isForwarded: true,
