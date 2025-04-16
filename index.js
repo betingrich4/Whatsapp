@@ -291,7 +291,7 @@ async function init() {
 init();
 
 app.get('index.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.redirect('https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD');
 });
 
 app.listen(PORT, () => {
