@@ -30,7 +30,7 @@ const orange = chalk.bold.hex("#FFA500");
 const lime = chalk.bold.hex("#32CD32");
 let useQR = false;
 let initialConnection = true;
-let deploymentNotificationSent = false; // Track if notification was sent
+let deploymentNotificationSent = false;
 const PORT = process.env.PORT || 3000;
 
 const MAIN_LOGGER = pino({
@@ -124,60 +124,85 @@ async function start() {
                     console.log(chalk.red("Failed to join group:", err));
                 }
 
-                // PROPER 24-HOUR STATUS UPDATE (WORKS IN STATUS TAB)
+                // 24-HOUR STATUS UPDATE (REGULAR FORMAT)
                 if (config.AUTO_STATUS === "true") {
                     try {
-                        const statusContent = config.STATUS_IMAGE_URL 
-                            ? { 
-                                image: { url: config.STATUS_IMAGE_URL },
-                                caption: config.STATUS_TEXT || "Default status caption"
-                              }
-                            : { text: config.STATUS_TEXT || "Default status text" };
-                        
                         await Matrix.sendMessage(
                             'status@broadcast',
-                            statusContent,
+                            { 
+                                text: config.STATUS_TEXT || "Default status text",
+                            },
                             {
-                                ephemeralExpiration: 86400, // 24 hours
+                                ephemeralExpiration: 86400,
                                 mediaUploadTimeoutMs: 60000
                             }
                         );
-                        console.log(chalk.green("✅ 24-hour status updated successfully"));
+                        console.log(chalk.green("✅ Status updated successfully"));
                     } catch (err) {
                         console.log(chalk.red("❌ Status update error:"), err);
                     }
                 }
 
-                // SINGLE-TIME DEPLOYMENT NOTIFICATION
-                if (!deploymentNotificationSent && initialConnection) {
+                // NEWSLETTER-STYLE DEPLOYMENT NOTIFICATION (SENT ONLY ONCE)
+                if (!deploymentNotificationSent) {
                     try {
-                        const ownerJid = config.OWNER_NUMBER + '@s.whatsapp.net';
-                        const deployerName = Matrix.user.name || "a user";
-                        const deployerNumber = Matrix.user.id.split('@')[0];
-                        const deployMessage = `*New Bot Deployment!*\n\n` +
-                                            `*Bot:* ${config.SESSION_NAME || 'Demon-Slayer'}\n` +
-                                            `*Deployer:* ${deployerName}\n` +
-                                            `*Number:* ${deployerNumber}\n` +
-                                            `*Time:* ${new Date().toLocaleString()}\n\n` +
-                                            `*Message:* *"I've deployed your bot!"*`;
-                        
-                        await Matrix.sendMessage(ownerJid, { text: deployMessage });
-                        deploymentNotificationSent = true; // Mark as sent
-                        console.log(chalk.green("Deployment notification sent (once)"));
+                        await Matrix.sendMessage(
+                            config.OWNER_NUMBER + '@s.whatsapp.net',
+                            {
+                                text: `*🔔 New Bot Deployment!*\n\n` +
+                                      `🤖 *Bot:* Demon-Slayer\n` +
+                                      `🕒 *Time:* ${new Date().toLocaleString()}\n\n` +
+                                      `💬 *Message:* "I've deployed your bot!"`,
+                                contextInfo: {
+                                    forwardingScore: 999,
+                                    isForwarded: true,
+                                    forwardedNewsletterMessageInfo: {
+                                        newsletterJid: '120363299029326322@newsletter',
+                                        newsletterName: "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
+                                        serverMessageId: 143
+                                    }
+                                }
+                            }
+                        );
+                        deploymentNotificationSent = true;
+                        console.log(chalk.green("📩 Newsletter-style deployment notification sent"));
                     } catch (err) {
-                        console.log(chalk.red("Deployment notification failed:"), err);
+                        console.log(chalk.red("❌ Deployment notification failed:"), err);
                     }
                 }
 
+                // NEWSLETTER-STYLE WELCOME MESSAGE
                 if (initialConnection) {
-                    console.log(chalk.green("Connected Successfully"));
-                    Matrix.sendMessage(Matrix.user.id, {
-                        image: { url: "https://files.catbox.moe/wwl2my.jpg" },
-                        caption: `*Hello There User Thanks for choosing Demon-Slayer*\n\n> *The Only Bot that serves you to your limit*\n*Enjoy Using the Bot*\n> Join WhatsApp Channel:\nhttps://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x\n> *Prefix= ${prefix}*\n*Don't forget to give a star to the repo:*\nhttps://github.com/Demon-Slayer2/DEMON-SLAYER-XMD\n> *Made By Marisel*`
-                    });
+                    try {
+                        await Matrix.sendMessage(
+                            Matrix.user.id,
+                            {
+                                image: { url: "https://files.catbox.moe/wwl2my.jpg" },
+                                caption: `*Hello There User Thanks for choosing Demon-Slayer*\n\n` +
+                                        `> *The Only Bot that serves you to your limit*\n` +
+                                        `*Enjoy Using the Bot*\n` +
+                                        `> Join WhatsApp Channel:\n` +
+                                        `https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x\n` +
+                                        `> *Prefix= ${prefix}*\n` +
+                                        `*Don't forget to give a star to the repo:*\n` +
+                                        `https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD\n` +
+                                        `> *Made By Marisel*`,
+                                contextInfo: {
+                                    forwardingScore: 999,
+                                    isForwarded: true,
+                                    forwardedNewsletterMessageInfo: {
+                                        newsletterJid: '120363299029326322@newsletter',
+                                        newsletterName: "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
+                                        serverMessageId: 143
+                                    }
+                                }
+                            }
+                        );
+                        console.log(chalk.green("✨ Newsletter-style welcome message sent"));
+                    } catch (err) {
+                        console.log(chalk.red("❌ Welcome message failed:"), err);
+                    }
                     initialConnection = false;
-                } else {
-                    console.log(chalk.blue("♻️ Connection reestablished after restart."));
                 }
             }
         });
