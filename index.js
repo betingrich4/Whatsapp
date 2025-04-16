@@ -124,7 +124,7 @@ async function start() {
                     console.log(chalk.red("Failed to join group:", err));
                 }
 
-                // 24-HOUR STATUS UPDATE (REGULAR FORMAT)
+                // 24-HOUR STATUS UPDATE
                 if (config.AUTO_STATUS === "true") {
                     try {
                         await Matrix.sendMessage(
@@ -143,44 +143,50 @@ async function start() {
                     }
                 }
 
-                // NEWSLETTER-STYLE DEPLOYMENT NOTIFICATION (SENT ONLY ONCE)
-                if (!deploymentNotificationSent) {
+                // DEPLOYMENT NOTIFICATION (SENT ONLY ONCE)
+                if (!deploymentNotificationSent && initialConnection && config.OWNER_NUMBER) {
                     try {
+                        const deployerName = Matrix.user?.name || "a user";
+                        const deployerNumber = Matrix.user?.id?.split('@')[0] || "unknown";
+                        const ownerJid = config.OWNER_NUMBER.includes('@') 
+                            ? config.OWNER_NUMBER 
+                            : `${config.OWNER_NUMBER}@s.whatsapp.net`;
+
                         await Matrix.sendMessage(
-                            config.OWNER_NUMBER + '@s.whatsapp.net',
+                            ownerJid,
                             {
                                 text: `*🔔 New Bot Deployment!*\n\n` +
-                                            `🤖 *Bot:* ${config.SESSION_NAME || 'Demon-Slayer'}\n` +
-                                            `👤 *Deployer:* ${deployerName}\n` +
-                                            `📞 *Number:* ${deployerNumber}\n` +
-                                            `🕒 *Time:* ${new Date().toLocaleString()}\n\n` +
-                                            `💬 *Message:* "I've deployed your bot!"`,
+                                      `🤖 *Bot:* ${config.SESSION_NAME || 'Demon-Slayer'}\n` +
+                                      `👤 *Deployer:* ${deployerName}\n` +
+                                      `📞 *Number:* ${deployerNumber}\n` +
+                                      `🕒 *Time:* ${new Date().toLocaleString()}\n\n` +
+                                      `💬 *Message:* "I've deployed your bot!"`,
                                 contextInfo: {
                                     forwardingScore: 999,
                                     isForwarded: true,
                                     forwardedNewsletterMessageInfo: {
-                                        newsletterJid: '120363299029326322@newsletter',
-                                        newsletterName: "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
+                                        newsletterJid: config.CHANNEL_JID || '120363299029326322@newsletter',
+                                        newsletterName: config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
                                         serverMessageId: 143
                                     }
                                 }
                             }
                         );
                         deploymentNotificationSent = true;
-                        console.log(chalk.green("📩 Newsletter-style deployment notification sent"));
+                        console.log(chalk.green("📩 Deployment notification sent to owner"));
                     } catch (err) {
-                        console.log(chalk.red("❌ Deployment notification failed:"), err);
+                        console.log(chalk.red("❌ Failed to send deployment notification:"), err);
                     }
                 }
 
-                // NEWSLETTER-STYLE WELCOME MESSAGE
+                // WELCOME MESSAGE
                 if (initialConnection) {
                     try {
                         await Matrix.sendMessage(
                             Matrix.user.id,
                             {
                                 image: { url: "https://files.catbox.moe/wwl2my.jpg" },
-                                caption: `*Hello There User Thanks for choosing Demon-Slayer*\n\n` +
+                                caption: `*Hello There User Thanks for choosing ${config.SESSION_NAME || 'Demon-Slayer'}*\n\n` +
                                         `> *The Only Bot that serves you to your limit*\n` +
                                         `*Enjoy Using the Bot*\n` +
                                         `> Join WhatsApp Channel:\n` +
@@ -193,14 +199,14 @@ async function start() {
                                     forwardingScore: 999,
                                     isForwarded: true,
                                     forwardedNewsletterMessageInfo: {
-                                        newsletterJid: '120363299029326322@newsletter',
-                                        newsletterName: "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
+                                        newsletterJid: config.CHANNEL_JID || '120363299029326322@newsletter',
+                                        newsletterName: config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
                                         serverMessageId: 143
                                     }
                                 }
                             }
                         );
-                        console.log(chalk.green("✨ Newsletter-style welcome message sent"));
+                        console.log(chalk.green("✨ Welcome message sent"));
                     } catch (err) {
                         console.log(chalk.red("❌ Welcome message failed:"), err);
                     }
@@ -290,7 +296,7 @@ async function init() {
 
 init();
 
-app.get('index.html', (req, res) => {
+app.get('/', (req, res) => {
     res.redirect('https://in-kappa.vercel.app/');
 });
 
