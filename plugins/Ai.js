@@ -6,8 +6,17 @@ import config from '../../config.cjs';
 const __filename = new URL(import.meta.url).pathname;
 const __dirname = path.dirname(__filename);
 const chatHistoryFile = path.resolve(__dirname, '../deepseek_history.json');
-const newsletterJid = config.CHANNEL_JID || '120363299029326322@newsletter';
-const newsletterName = config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑";
+
+// Newsletter configuration
+const newsletterContext = {
+    forwardingScore: 999,
+    isForwarded: true,
+    forwardedNewsletterMessageInfo: {
+        newsletterJid: config.CHANNEL_JID || '120363299029326322@newsletter',
+        newsletterName: config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
+        serverMessageId: 143
+    }
+};
 
 const deepSeekSystemPrompt = "You are an intelligent AI assistant.";
 
@@ -24,7 +33,7 @@ async function writeChatHistoryToFile(chatHistory) {
     try {
         await fs.writeFile(chatHistoryFile, JSON.stringify(chatHistory, null, 2));
     } catch (err) {
-        console.error('Error writing chat history to file:', err);
+        console.error('Error writing chat history:', err);
     }
 }
 
@@ -51,16 +60,8 @@ const deepseek = async (m, Matrix) => {
     if (text === "/forget") {
         await deleteChatHistory(chatHistory, m.sender);
         await Matrix.sendMessage(m.from, { 
-            text: 'Conversation history deleted successfully',
-            contextInfo: {
-                forwardingScore: 999,
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: newsletterJid,
-                    newsletterName: newsletterName,
-                    serverMessageId: 143
-                }
-            }
+            text: '🗡️ Conversation history purged',
+            contextInfo: newsletterContext
         }, { quoted: m });
         return;
     }
@@ -69,21 +70,13 @@ const deepseek = async (m, Matrix) => {
     const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
     const prompt = m.body.slice(prefix.length + cmd.length).trim();
 
-    const validCommands = ['ai'];
+    const validCommands = ['ai', 'deepseek', 'ask'];
 
     if (validCommands.includes(cmd)) {
         if (!prompt) {
             await Matrix.sendMessage(m.from, { 
-                text: 'Please provide a prompt/question after the command',
-                contextInfo: {
-                    forwardingScore: 999,
-                    isForwarded: true,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid: newsletterJid,
-                        newsletterName: newsletterName,
-                        serverMessageId: 143
-                    }
-                }
+                text: '🌑 Please provide your question after the command',
+                contextInfo: newsletterContext
             }, { quoted: m });
             return;
         }
@@ -101,62 +94,33 @@ const deepseek = async (m, Matrix) => {
             const apiUrl = `https://api.paxsenix.biz.id/ai/gemini-realtime?text=${encodeURIComponent(prompt)}&session_id=ZXlKaklqb2lZMTg0T0RKall6TTNNek13TVdFNE1qazNJaXdpY2lJNkluSmZNbU01TUdGa05ETmtNVFF3WmpNNU5pSXNJbU5vSWpvaWNtTmZZVE16TURWaE1qTmpNR1ExTnpObFl5Sjk`;
             const response = await fetch(apiUrl);
 
-            if (!response.ok) {
-                throw new Error(`API error! status: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`API error: ${response.status}`);
 
             const responseData = await response.json();
             let answer = responseData.message;
 
+            // Update history
             await updateChatHistory(chatHistory, m.sender, { role: "user", content: prompt });
             await updateChatHistory(chatHistory, m.sender, { role: "assistant", content: answer });
 
+            // Enhanced response formatting
             const codeMatch = answer.match(/```([\s\S]*?)```/);
+            const responseMessage = {
+                text: codeMatch ? 
+                    `🗡️ *Demon-Slayer Code Response*\n\n\`\`\`${codeMatch[1]}\`\`\`` : 
+                    `🗡️ *Demon-Slayer Response*\n\n${answer}`,
+                contextInfo: newsletterContext
+            };
 
-            if (codeMatch) {
-                const code = codeMatch[1];
-                await Matrix.sendMessage(m.from, { 
-                    text: `🔹 *Code Response* 🔹\n\n\`\`\`${code}\`\`\``,
-                    contextInfo: {
-                        forwardingScore: 999,
-                        isForwarded: true,
-                        forwardedNewsletterMessageInfo: {
-                            newsletterJid: newsletterJid,
-                            newsletterName: newsletterName,
-                            serverMessageId: 143
-                        }
-                    }
-                }, { quoted: m });
-            } else {
-                await Matrix.sendMessage(m.from, { 
-                    text: answer,
-                    contextInfo: {
-                        forwardingScore: 999,
-                        isForwarded: true,
-                        forwardedNewsletterMessageInfo: {
-                            newsletterJid: newsletterJid,
-                            newsletterName: newsletterName,
-                            serverMessageId: 143
-                        }
-                    }
-                }, { quoted: m });
-            }
-
+            await Matrix.sendMessage(m.from, responseMessage, { quoted: m });
             await m.React("✅");
+
         } catch (err) {
             await Matrix.sendMessage(m.from, { 
-                text: "⚠️ Error processing your request. Please try again later.",
-                contextInfo: {
-                    forwardingScore: 999,
-                    isForwarded: true,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid: newsletterJid,
-                        newsletterName: newsletterName,
-                        serverMessageId: 143
-                    }
-                }
+                text: '❌ Demon-Slayer encountered an error',
+                contextInfo: newsletterContext
             }, { quoted: m });
-            console.error('DeepSeek API Error:', err);
+            console.error('API Error:', err);
             await m.React("❌");
         }
     }
