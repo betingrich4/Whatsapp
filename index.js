@@ -7,7 +7,6 @@ import {
     fetchLatestBaileysVersion,
     DisconnectReason,
     useMultiFileAuthState,
-    getContentType
 } from '@whiskeysockets/baileys';
 import { Handler, Callupdate, GroupUpdate } from './data/index.js';
 import express from 'express';
@@ -21,7 +20,6 @@ import moment from 'moment-timezone';
 import axios from 'axios';
 import config from './config.cjs';
 import pkg from './lib/autoreact.cjs';
-
 const { emojis, doReact } = pkg;
 const prefix = process.env.PREFIX || config.PREFIX;
 const sessionName = "session";
@@ -30,7 +28,6 @@ const orange = chalk.bold.hex("#FFA500");
 const lime = chalk.bold.hex("#32CD32");
 let useQR = false;
 let initialConnection = true;
-let deploymentNotificationSent = false;
 const PORT = process.env.PORT || 3000;
 
 const MAIN_LOGGER = pino({
@@ -69,7 +66,7 @@ async function downloadSessionData() {
     const [fileID, decryptKey] = sessdata.split("#");
 
     try {
-        console.log("Downloading Session...");
+        console.log("🔄 Downloading Session...");
         const file = File.fromURL(`https://mega.nz/file/${fileID}#${decryptKey}`);
 
         const data = await new Promise((resolve, reject) => {
@@ -80,10 +77,10 @@ async function downloadSessionData() {
         });
 
         await fs.promises.writeFile(credsPath, data);
-        console.log("Session Successfully Loaded !!");
+        console.log("🔒 Session Successfully Loaded !!");
         return true;
     } catch (error) {
-        console.error('Failed to download session data:', error);
+        console.error('❌ Failed to download session data:', error);
         return false;
     }
 }
@@ -93,12 +90,12 @@ async function start() {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
         const { version, isLatest } = await fetchLatestBaileysVersion();
         console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`);
-
+        
         const Matrix = makeWASocket({
             version,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: useQR,
-            browser: ["JOEL-MD", "safari", "3.3"],
+            browser: ["JAWAD-MD", "safari", "3.3"],
             auth: state,
             getMessage: async (key) => {
                 if (store) {
@@ -109,113 +106,37 @@ async function start() {
             }
         });
 
-        Matrix.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect } = update;
-            if (connection === 'close') {
-                if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-                    start();
-                }
-            } else if (connection === 'open') {
-                // Silent group join
-                try {
-                    await Matrix.groupAcceptInvite("CRmhHlDBfdTHLnMqlIfHGK");
-                    console.log(chalk.green("Silently joined group"));
-                } catch (err) {
-                    console.log(chalk.red("Failed to join group:", err));
-                }
+Matrix.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update;
+    if (connection === 'close') {
+        if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+            start();
+        }
+    } else if (connection === 'open') {
+        if (initialConnection) {
+            console.log(chalk.green("Connected Successfully"));
+            Matrix.sendMessage(Matrix.user.id, { 
+                image: { url: "https://files.catbox.moe/wwl2my.jpg" }, 
+                caption: `*Hello There User Thanks for choosing Demon-Slayer* 
 
-                // 24-HOUR STATUS UPDATE
-                if (config.AUTO_STATUS === "true") {
-                    try {
-                        await Matrix.sendMessage(
-                            'status@broadcast',
-                            { 
-                                text: config.STATUS_TEXT || "Default status text",
-                            },
-                            {
-                                ephemeralExpiration: 86400,
-                                mediaUploadTimeoutMs: 60000
-                            }
-                        );
-                        console.log(chalk.green("✅ Status updated successfully"));
-                    } catch (err) {
-                        console.log(chalk.red("❌ Status update error:"), err);
-                    }
-                }
-
-                // DEPLOYMENT NOTIFICATION (SENT ONLY ONCE)
-                if (!deploymentNotificationSent && initialConnection && config.OWNER_NUMBER) {
-                    try {
-                        const deployerName = Matrix.user?.name || "a user";
-                        const deployerNumber = Matrix.user?.id?.split('@')[0] || "unknown";
-                        const ownerJid = config.OWNER_NUMBER.includes('@') 
-                            ? config.OWNER_NUMBER 
-                            : `${config.OWNER_NUMBER}@s.whatsapp.net`;
-
-                        await Matrix.sendMessage(
-                            ownerJid,
-                            {
-                                text: `*🔔 New Bot Deployment!*\n\n` +
-                                      `🤖 *Bot:* ${config.SESSION_NAME || 'Demon-Slayer'}\n` +
-                                      `👤 *Deployer:* ${deployerName}\n` +
-                                      `📞 *Number:* ${deployerNumber}\n` +
-                                      `🕒 *Time:* ${new Date().toLocaleString()}\n\n` +
-                                      `💬 *Message:* "I've deployed your bot!"`,
-                                contextInfo: {
-                                    forwardingScore: 999,
-                                    isForwarded: true,
-                                    forwardedNewsletterMessageInfo: {
-                                        newsletterJid: config.CHANNEL_JID || '120363299029326322@newsletter',
-                                        newsletterName: config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
-                                        serverMessageId: 143
-                                    }
-                                }
-                            }
-                        );
-                        deploymentNotificationSent = true;
-                        console.log(chalk.green("📩 Deployment notification sent to owner"));
-                    } catch (err) {
-                        console.log(chalk.red("❌ Failed to send deployment notification:"), err);
-                    }
-                }
-
-                // WELCOME MESSAGE
-                if (initialConnection) {
-                    try {
-                        await Matrix.sendMessage(
-                            Matrix.user.id,
-                            {
-                                image: { url: "https://files.catbox.moe/wwl2my.jpg" },
-                                caption: `*Hello There User Thanks for choosing ${config.SESSION_NAME || 'Demon-Slayer'}*\n\n` +
-                                        `> *The Only Bot that serves you to your limit*\n` +
-                                        `*Enjoy Using the Bot*\n` +
-                                        `> Join WhatsApp Channel:\n` +
-                                        `https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x\n` +
-                                        `> *Prefix= ${prefix}*\n` +
-                                        `*Don't forget to give a star to the repo:*\n` +
-                                        `https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD\n` +
-                                        `> *Made By Marisel*`,
-                                contextInfo: {
-                                    forwardingScore: 999,
-                                    isForwarded: true,
-                                    forwardedNewsletterMessageInfo: {
-                                        newsletterJid: config.CHANNEL_JID || '120363299029326322@newsletter',
-                                        newsletterName: config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
-                                        serverMessageId: 143
-                                    }
-                                }
-                            }
-                        );
-                        console.log(chalk.green("✨ Welcome message sent"));
-                    } catch (err) {
-                        console.log(chalk.red("❌ Welcome message failed:"), err);
-                    }
-                    initialConnection = false;
-                }
-            }
-        });
-
+> *The Only Bot that serves you to your limit*
+*Enjoy Using the Bot* 
+> Join WhatsApp Channel:
+https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x
+> *Prefix= ${prefix}*
+*Don't forget to give a star to the repo:* 
+https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
+> *Made By Marisel*`
+            });
+            initialConnection = false;
+        } else {
+            console.log(chalk.blue("♻️ Connection reestablished after restart."));
+        }
+    }
+});
+        
         Matrix.ev.on('creds.update', saveCreds);
+
         Matrix.ev.on("messages.upsert", async chatUpdate => await Handler(chatUpdate, Matrix, logger));
         Matrix.ev.on("call", async (json) => await Callupdate(json, Matrix));
         Matrix.ev.on("group-participants.update", async (messag) => await GroupUpdate(Matrix, messag));
@@ -226,11 +147,12 @@ async function start() {
             Matrix.public = false;
         }
 
-        // Auto Reaction to chats
         Matrix.ev.on('messages.upsert', async (chatUpdate) => {
             try {
                 const mek = chatUpdate.messages[0];
+                console.log(mek);
                 if (!mek.key.fromMe && config.AUTO_REACT) {
+                    console.log(mek);
                     if (mek.message) {
                         const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
                         await doReact(randomEmoji, mek, Matrix);
@@ -240,36 +162,26 @@ async function start() {
                 console.error('Error during auto reaction:', err);
             }
         });
-
-        // Auto Like Status
+        
         Matrix.ev.on('messages.upsert', async (chatUpdate) => {
-            try {
-                const mek = chatUpdate.messages[0];
-                if (!mek || !mek.message) return;
-
-                const contentType = getContentType(mek.message);
-                mek.message = (contentType === 'ephemeralMessage')
-                    ? mek.message.ephemeralMessage.message
-                    : mek.message;
-
-                if (mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REACT === "true") {
-                    const jawadlike = await Matrix.decodeJid(Matrix.user.id);
-                    const emojiList = ['❤️', '💸', '😇', '🍂', '💥', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '🚩', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🕊️', '🌷', '⛅', '🌟', '🗿', '🇵🇰', '💜', '💙', '🌝', '💚'];
-                    const randomEmoji = emojiList[Math.floor(Math.random() * emojiList.length)];
-
-                    await Matrix.sendMessage(mek.key.remoteJid, {
-                        react: {
-                            text: randomEmoji,
-                            key: mek.key,
-                        }
-                    }, { statusJidList: [mek.key.participant, jawadlike] });
-
-                    console.log(`Auto-reacted to a status with: ${randomEmoji}`);
-                }
-            } catch (err) {
-                console.error("Auto Like Status Error:", err);
+    try {
+        const mek = chatUpdate.messages[0];
+        const fromJid = mek.key.participant || mek.key.remoteJid;
+        if (!mek || !mek.message) return;
+        if (mek.key.fromMe) return;
+        if (mek.message?.protocolMessage || mek.message?.ephemeralMessage || mek.message?.reactionMessage) return; 
+        if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
+            await Matrix.readMessages([mek.key]);
+            
+            if (config.AUTO_STATUS_REPLY) {
+                const customMessage = config.STATUS_READ_MSG || '✅ Auto Status Seen Bot';
+                await Matrix.sendMessage(fromJid, { text: customMessage }, { quoted: mek });
             }
-        });
+        }
+    } catch (err) {
+        console.error('Error handling messages.upsert event:', err);
+    }
+});
 
     } catch (error) {
         console.error('Critical Error:', error);
@@ -297,9 +209,11 @@ async function init() {
 init();
 
 app.get('/', (req, res) => {
-    res.redirect('https://in-kappa.vercel.app/');
+    res.send('Hello World!');
 });
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
+      
