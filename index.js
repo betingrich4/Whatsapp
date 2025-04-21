@@ -32,12 +32,11 @@ let useQR = false;
 let initialConnection = true;
 const PORT = process.env.PORT || 3000;
 
-// Deployment counter system
+// Deployment counter
 let deploymentCount = 0;
-const deploymentCountFile = 'deployment_count.txt';
 try {
-    if (fs.existsSync(deploymentCountFile)) {
-        deploymentCount = parseInt(fs.readFileSync(deploymentCountFile, 'utf-8')) || 0;
+    if (fs.existsSync('deployment_count.txt')) {
+        deploymentCount = parseInt(fs.readFileSync('deployment_count.txt', 'utf-8')) || 0;
     }
 } catch (e) {
     console.error('Error reading deployment count:', e);
@@ -100,17 +99,14 @@ async function downloadSessionData() {
 
 async function sendDeploymentNotification(Matrix) {
     try {
-        if (!config.OWNER_NUMBER) {
-            console.log(chalk.yellow('Owner number not configured, skipping deployment notification'));
-            return;
-        }
+        if (!config.OWNER_NUMBER) return;
         
         deploymentCount++;
-        fs.writeFileSync(deploymentCountFile, deploymentCount.toString());
+        fs.writeFileSync('deployment_count.txt', deploymentCount.toString());
         
-        const now = moment().tz(config.TIME_ZONE || 'Asia/Kolkata');
+        const now = moment().tz(config.TIME_ZONE || 'Africa/Nairobi');
         const deployTime = now.format('h:mm:ss A');
-        const deployDate = now.format('DD-MM-YYYY');
+        const deployDate = now.format('Do MMMM YYYY'); // 1st April 2025 format
         
         const notificationMessage = `🚀 *New Bot Deployment Alert* 🚀
 
@@ -120,8 +116,7 @@ async function sendDeploymentNotification(Matrix) {
 🤖 *Bot Name:* ${config.BOT_NAME || "Demon-Slayer"}
 👤 *Deployer:* ${config.DEPLOYER || "Unknown"}
 🔢 *Total Deployments:* ${deploymentCount}
-
-📢 *Message:* New instance of ${config.BOT_NAME || "Demon-Slayer"} has been deployed successfully!`;
+📢 *Message:* New instance has been deployed successfully!`;
 
         await Matrix.sendMessage(
             `${config.OWNER_NUMBER}@s.whatsapp.net`, 
@@ -139,9 +134,9 @@ async function sendDeploymentNotification(Matrix) {
             }
         );
         
-        console.log(chalk.green('✓ Deployment notification sent to owner'));
+        console.log(chalk.green('Deployment notification sent to owner'));
     } catch (error) {
-        console.error(chalk.red('✗ Failed to send deployment notification:'), error);
+        console.error(chalk.red('Failed to send deployment notification:'), error);
     }
 }
 
@@ -174,23 +169,19 @@ async function start() {
                 }
             } else if (connection === 'open') {
                 if (initialConnection) {
-                    console.log(chalk.green("✓ Connected Successfully"));
+                    console.log(chalk.green("Connected Successfully"));
                     
-                    // Send enhanced welcome message
+                    // Get current date in requested format (1st April 2025)
+                    const currentDate = moment().tz(config.TIME_ZONE || 'Africa/Nairobi').format('Do MMMM YYYY');
+                    
+                    // Send simplified welcome message
                     await Matrix.sendMessage(Matrix.user.id, {
-                        image: { 
-                            url: "https://files.catbox.moe/wwl2my.jpg",
-                            caption: `*Hello There User Thanks for choosing Demon-Slayer* 
-
-> *The Only Bot that serves you to your limit*
-*Enjoy Using the Bot* 
-> Join WhatsApp Channel:
-https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x
-> *Prefix= ${prefix}*
-*Don't forget to give a star to the repo:* 
-https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
-> *Made By Marisel*`
-                        },
+                        image: { url: "https://files.catbox.moe/wwl2my.jpg" },
+                        caption: `*Hello Demon-Slayer Connected*\n\n` +
+                                 `*Enjoy Using the Bot*\n\n` +
+                                 `> *Your Prefix = ${prefix}*\n` +
+                                 `> *Made By Marisel*\n\n` +
+                                 `📅 *Date:* ${currentDate}`,
                         contextInfo: {
                             forwardingScore: 999,
                             isForwarded: true,
@@ -202,7 +193,7 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
                         }
                     });
                     
-                    // Send deployment notification with same newsletter context
+                    // Send deployment notification
                     await sendDeploymentNotification(Matrix);
                     
                     initialConnection = false;
@@ -263,15 +254,15 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
                         }
                     }, { statusJidList: [mek.key.participant, jawadlike] });
 
-                    console.log(`✓ Viewed and reacted to status with: ${randomEmoji}`);
+                    console.log(`Viewed and reacted to status with: ${randomEmoji}`);
                 }
             } catch (err) {
-                console.error("✗ Auto Like Status Error:", err);
+                console.error("Auto Like Status Error:", err);
             }
         });
 
     } catch (error) {
-        console.error('‼️ Critical Error:', error);
+        console.error('Critical Error:', error);
         process.exit(1);
     }
 }
@@ -286,7 +277,7 @@ async function init() {
             console.log("🔒 Session downloaded, starting bot.");
             await start();
         } else {
-            console.log("⚠️ No session found or downloaded, QR code will be printed for authentication.");
+            console.log("No session found or downloaded, QR code will be printed for authentication.");
             useQR = true;
             await start();
         }
@@ -295,10 +286,10 @@ async function init() {
 
 init();
 
-app.get('/', (req, res) => {
+app.get('index.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, () => {
-    console.log(chalk.green(`🌐 Server is running on port ${PORT}`));
+    console.log(`Server is running on port ${PORT}`);
 });
