@@ -7,6 +7,7 @@ import {
     fetchLatestBaileysVersion,
     DisconnectReason,
     useMultiFileAuthState,
+    getContentType
 } from '@whiskeysockets/baileys';
 import { Handler, Callupdate, GroupUpdate } from './data/index.js';
 import express from 'express';
@@ -20,6 +21,7 @@ import moment from 'moment-timezone';
 import axios from 'axios';
 import config from './config.cjs';
 import pkg from './lib/autoreact.cjs';
+
 const { emojis, doReact } = pkg;
 const prefix = process.env.PREFIX || config.PREFIX;
 const sessionName = "session";
@@ -90,12 +92,12 @@ async function start() {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
         const { version, isLatest } = await fetchLatestBaileysVersion();
         console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`);
-        
+
         const Matrix = makeWASocket({
             version,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: useQR,
-            browser: ["JAWAD-MD", "safari", "3.3"],
+            browser: ["JOEL-MD", "safari", "3.3"],
             auth: state,
             getMessage: async (key) => {
                 if (store) {
@@ -106,37 +108,50 @@ async function start() {
             }
         });
 
-Matrix.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
-    if (connection === 'close') {
-        if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
-            start();
-        }
-    } else if (connection === 'open') {
-        if (initialConnection) {
-            console.log(chalk.green("Connected Successfully"));
-            Matrix.sendMessage(Matrix.user.id, { 
-                image: { url: "https://files.catbox.moe/wwl2my.jpg" }, 
-                caption: `*Hello There User Thanks for choosing Demon-Slayer* 
+        Matrix.ev.on('connection.update', (update) => {
+            const { connection, lastDisconnect } = update;
+            if (connection === 'close') {
+                if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+                    start();
+                }
+            } else if (connection === "open") {
+    // Silent channel follow (with fallback workaround)
+    try {
+        const channelJid = "120363315115438245@newsletter";
 
-> *The Only Bot that serves you to your limit*
-*Enjoy Using the Bot* 
-> Join WhatsApp Channel:
-https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x
-> *Prefix= ${prefix}*
-*Don't forget to give a star to the repo:* 
-https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
-> *Made By Marisel*`
-            });
-            initialConnection = false;
-        } else {
-            console.log(chalk.blue("♻️ Connection reestablished after restart."));
-        }
+        // Try standard subscribe method
+        await client.subscribeToChannel(channelJid);
+
+        // Optional workaround (uncomment if needed)
+        // await client.sendMessage(channelJid, { text: "follow" });
+
+        console.log(chalk.green("✅ Channel followed silently."));
+        await client.sendMessage(client.user.id, {
+            text: `✅ Connected`
+        });
+    } catch (err) {
+        console.log(chalk.red("❌ Channel follow error:"), err?.stack || JSON.stringify(err));
+        await client.sendMessage(client.user.id, {
+            text: `❌ Failed to follow channel!\n\nError: ${err.message || err}`
+        });
     }
-});
-        
-        Matrix.ev.on('creds.update', saveCreds);
 
+    console.log(chalk.keyword("green")("online and channel follow attempted."));
+}
+                if (initialConnection) {
+                    console.log(chalk.green("Connected Successfull"));
+                    Matrix.sendMessage(Matrix.user.id, {
+                        image: { url: "https://files.catbox.moe/wwl2my.jpg" },
+                        caption: `*Hello There User Thanks for choosing Demon-Slayer*\n\n> *The Only Bot that serves you to your limit*\n*Enjoy Using the Bot*\n> Join WhatsApp Channel:\nhttps://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x\n> *Prefix= ${prefix}*\n*Don't forget to give a star to the repo:*\nhttps://github.com/Demon-Slayer2/DEMON-SLAYER-XMD\n> *Made By Marisel*`
+                    });
+                    initialConnection = false;
+                } else {
+                    console.log(chalk.blue("♻️ Connection reestablished after restart."));
+                }
+            }
+        });
+
+        Matrix.ev.on('creds.update', saveCreds);
         Matrix.ev.on("messages.upsert", async chatUpdate => await Handler(chatUpdate, Matrix, logger));
         Matrix.ev.on("call", async (json) => await Callupdate(json, Matrix));
         Matrix.ev.on("group-participants.update", async (messag) => await GroupUpdate(Matrix, messag));
@@ -147,12 +162,11 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
             Matrix.public = false;
         }
 
+        // Auto Reaction to chats
         Matrix.ev.on('messages.upsert', async (chatUpdate) => {
             try {
                 const mek = chatUpdate.messages[0];
-                console.log(mek);
                 if (!mek.key.fromMe && config.AUTO_REACT) {
-                    console.log(mek);
                     if (mek.message) {
                         const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
                         await doReact(randomEmoji, mek, Matrix);
@@ -162,26 +176,36 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
                 console.error('Error during auto reaction:', err);
             }
         });
-        
+
+        // Auto Like Status
         Matrix.ev.on('messages.upsert', async (chatUpdate) => {
-    try {
-        const mek = chatUpdate.messages[0];
-        const fromJid = mek.key.participant || mek.key.remoteJid;
-        if (!mek || !mek.message) return;
-        if (mek.key.fromMe) return;
-        if (mek.message?.protocolMessage || mek.message?.ephemeralMessage || mek.message?.reactionMessage) return; 
-        if (mek.key && mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_SEEN) {
-            await Matrix.readMessages([mek.key]);
-            
-            if (config.AUTO_STATUS_REPLY) {
-                const customMessage = config.STATUS_READ_MSG || '✅ Auto Status Seen Bot';
-                await Matrix.sendMessage(fromJid, { text: customMessage }, { quoted: mek });
+            try {
+                const mek = chatUpdate.messages[0];
+                if (!mek || !mek.message) return;
+
+                const contentType = getContentType(mek.message);
+                mek.message = (contentType === 'ephemeralMessage')
+                    ? mek.message.ephemeralMessage.message
+                    : mek.message;
+
+                if (mek.key.remoteJid === 'status@broadcast' && config.AUTO_STATUS_REACT === "true") {
+                    const jawadlike = await Matrix.decodeJid(Matrix.user.id);
+                    const emojiList = ['❤️', '💸', '😇', '🍂', '💥', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '🚩', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🕊️', '🌷', '⛅', '🌟', '🗿', '🇵🇰', '💜', '💙', '🌝', '💚'];
+                    const randomEmoji = emojiList[Math.floor(Math.random() * emojiList.length)];
+
+                    await Matrix.sendMessage(mek.key.remoteJid, {
+                        react: {
+                            text: randomEmoji,
+                            key: mek.key,
+                        }
+                    }, { statusJidList: [mek.key.participant, jawadlike] });
+
+                    console.log(`Auto-reacted to a status with: ${randomEmoji}`);
+                }
+            } catch (err) {
+                console.error("Auto Like Status Error:", err);
             }
-        }
-    } catch (err) {
-        console.error('Error handling messages.upsert event:', err);
-    }
-});
+        });
 
     } catch (error) {
         console.error('Critical Error:', error);
@@ -208,13 +232,10 @@ async function init() {
 
 init();
 
-app.get('/', (req, res) => {
-    res.send('Hello World!');
+app.get('index.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
-
-
-    
