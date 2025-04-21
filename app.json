@@ -1,9 +1,9 @@
 {
-  "name": "JAWAD-MD",
-  "description": "I am JAWAD-MD WhatsApp MultiDevice Bot built in NodeJs to enhance the experience.",
-  "logo": "https://raw.githubusercontent.com/XdTechPro/KHAN-DATA/refs/heads/main/logo/KHAN.png",
-  "keywords": ["JAWAD-MD"],
-  "repository": "https://github.com/XdTechPro/JAWAD-MD",
+  "name": "Demon-slayer",
+  "description": "Ok 3 devs made it.",
+  "logo": "https://files.catbox.moe/5kvvfg.jpg",
+  "keywords": ["Demon-Slayer"],
+  "repository": "https://github.com/Demon-Slayer2/DEMONS-SLAYER-XMD",
   "stack": "container",
   "env": { 
       "SESSION_ID": {
@@ -15,92 +15,81 @@
       "description": "mode public or self",
       "required": true,
       "value": "public"
-    },
-    "BOT_NAME": {
-      "description": "change bot name what you want!",
-      "required": false,
-      "value": "JAWAD-MD"
-    },
-    "MENU_IMAGE": {
-      "description": "change menu image if want otherwise use default",
-      "required": false,
-      "value": "https://files.catbox.moe/7l1tt5.jpg"
-    },
-    "DESCRIPTION": {
-      "description": "add caption for menu and etc",
-      "required": false,
-      "value": "© ᴘᴏᴡᴇʀᴇᴅ ʙʏ Jᴀᴡᴀᴅ TᴇᴄʜX"
-    },
-    "ANTI_DELETE": {
-      "description": "set path for antidelete for same chat set to same",
-      "required": true,
-      "value": "inbox"
-    },
-    "ANTI_DELETE_PATH": {
-      "description": "make it true for use anti delete",
-      "required": true,
-      "value": "true"
-    },
-    
+        },
     "AUTO_STATUS_SEEN": {
       "description": "make it true if you want bot to view status",
       "required": false,
       "value": "true"
-    },
-    "AUTO_STATUS_REPLY": {
-      "description": "make it true if you want to send message after seen status",
+        },
+    "AUTOLIKE_STATUS": {
+      "description": "Make it true if you want bot to read and like status else leave blank",
       "required": false,
-      "value": "false"
+      "value": "true"
     },
-    "STATUS_READ_MSG": {
-      "description": "set your status reply message",
+    "AUTOLIKE_EMOJI": {
+      "description": "Input your custom status like emoji else leave blank to use default => 🫨",
       "required": false,
-      "value": "*Status Seen By JAWAD-MD 👻🤍*"
+      "value": "🫨"
+      },
+    "AUTO_REACT": {
+      "description": "make it true if you want a bot to react on messages",
+      "required": false,
+      "value": ""
     },
-    "OWNER_NAME": {
-      "description": "set your status reply message",
+    "AUTO_REPLY_STATUS": {
+      "description": "make it true if you want the bot to send message after viewing status else leave blank",
       "required": false,
-      "value": "JAWAD-MD"
-    },
-    "OWNER_NUMBER": {
-      "description": "set your status reply message",
-      "required": false,
-      "value": "92310344XXXX"
+      "value": ""
     },
     "AUTO_READ": {
       "description": "make it true if you want bot to read message",
       "required": false,
-      "value": "false"
+      "value": ""
     },
     "AUTO_TYPING": {
       "description": "make it true if you want bot to show typing",
       "required": false,
-      "value": "false"
+      "value": ""
     },
     "AUTO_RECORDING": {
       "description": "make it true if you want bot to show recording audio",
       "required": false,
-      "value": "false"
+      "value": ""
     },
     "ALWAYS_ONLINE": {
       "description": "make it true if you want bot to show always online",
+      "required": false,
+      "value": "true"
+      },
+    "AUTO_BIO": {
+      "description": "make it true if you want the bot to update de bio after restart",
       "required": false,
       "value": "false"
     },
     "AUTO_BLOCK": {
       "description": "make it true if you want bot to auto block only 212 numbers",
       "required": false,
-      "value": "false"
+      "value": ""
     },
     "REJECT_CALL": {
       "description": "make it true if you want to reject call",
       "required": false,
-      "value": "false"
+      "value": ""
+     },
+    "WELCOME": {
+      "description": "make it true if you want to enable auto welcome",
+      "required": false,
+      "value": "" 
+      },
+    "ANTILINK": {
+      "description": "make it true if you want to enable auto delete links",
+      "required": false,
+      "value": ""  
     },
     "PREFIX": {
       "description": "Your Bot Prefix default (.)",
       "required": false,
-      "value": "."
+      "value": ""
     }
     },
     "buildpacks": [
@@ -118,4 +107,3 @@
     }
   ]
 }
-
