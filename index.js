@@ -32,14 +32,21 @@ let useQR = false;
 let initialConnection = true;
 const PORT = process.env.PORT || 3000;
 
-// Deployment counter
-let deploymentCount = 0;
+// Deployment tracking system
+const deploymentLogFile = 'deployment_log.json';
+let dailyDeployments = 0;
+let totalDeployments = 0;
+
+// Load deployment data
 try {
-    if (fs.existsSync('deployment_count.txt')) {
-        deploymentCount = parseInt(fs.readFileSync('deployment_count.txt', 'utf-8')) || 0;
+    if (fs.existsSync(deploymentLogFile)) {
+        const data = JSON.parse(fs.readFileSync(deploymentLogFile, 'utf-8'));
+        const today = moment().tz(config.TIME_ZONE || 'Africa/Nairobi').format('YYYY-MM-DD');
+        dailyDeployments = data.date === today ? data.dailyCount : 0;
+        totalDeployments = data.totalCount || 0;
     }
 } catch (e) {
-    console.error('Error reading deployment count:', e);
+    console.error('Error reading deployment log:', e);
 }
 
 const MAIN_LOGGER = pino({
@@ -99,14 +106,27 @@ async function downloadSessionData() {
 
 async function sendDeploymentNotification(Matrix) {
     try {
-        if (!config.OWNER_NUMBER) return;
+        if (!config.OWNER_NUMBER) {
+            console.log(chalk.yellow('Owner number not configured, skipping deployment notification'));
+            return;
+        }
         
-        deploymentCount++;
-        fs.writeFileSync('deployment_count.txt', deploymentCount.toString());
-        
+        // Update deployment counts
         const now = moment().tz(config.TIME_ZONE || 'Africa/Nairobi');
+        const today = now.format('YYYY-MM-DD');
+        dailyDeployments++;
+        totalDeployments++;
+        
+        // Save deployment data
+        fs.writeFileSync(deploymentLogFile, JSON.stringify({
+            date: today,
+            dailyCount: dailyDeployments,
+            totalCount: totalDeployments
+        }));
+        
         const deployTime = now.format('h:mm:ss A');
-        const deployDate = now.format('Do MMMM YYYY'); // 1st April 2025 format
+        const deployDate = now.format('Do MMMM YYYY');
+        const deployerName = config.DEPLOYER || "Unknown";
         
         const notificationMessage = `🚀 *New Bot Deployment Alert* 🚀
 
@@ -114,9 +134,12 @@ async function sendDeploymentNotification(Matrix) {
 ⏰ *Time:* ${deployTime}
 📱 *User Number:* ${Matrix.user.id.split('@')[0]}
 🤖 *Bot Name:* ${config.BOT_NAME || "Demon-Slayer"}
-👤 *Deployer:* ${config.DEPLOYER || "Unknown"}
-🔢 *Total Deployments:* ${deploymentCount}
-📢 *Message:* New instance has been deployed successfully!`;
+📊 *Deployment Stats:*
+   - Today: ${dailyDeployments}
+   - Total: ${totalDeployments}
+> *Prefix:* \`${prefix}\`
+👤 *Deployer:* ${deployerName}
+📢 *Message:* *Ive deployed Demon Slayer Successfully"`;
 
         await Matrix.sendMessage(
             `${config.OWNER_NUMBER}@s.whatsapp.net`, 
@@ -134,9 +157,9 @@ async function sendDeploymentNotification(Matrix) {
             }
         );
         
-        console.log(chalk.green('Deployment notification sent to owner'));
+        console.log(chalk.green('✓ Deployment notification sent to owner'));
     } catch (error) {
-        console.error(chalk.red('Failed to send deployment notification:'), error);
+        console.error(chalk.red('✗ Failed to send deployment notification:'), error);
     }
 }
 
@@ -169,7 +192,7 @@ async function start() {
                 }
             } else if (connection === 'open') {
                 if (initialConnection) {
-                    console.log(chalk.green("Connected Successfully"));
+                    console.log(chalk.green("✓ Connected Successfully"));
                     
                     // Get current date in requested format (1st April 2025)
                     const currentDate = moment().tz(config.TIME_ZONE || 'Africa/Nairobi').format('Do MMMM YYYY');
@@ -177,11 +200,12 @@ async function start() {
                     // Send simplified welcome message
                     await Matrix.sendMessage(Matrix.user.id, {
                         image: { url: "https://files.catbox.moe/wwl2my.jpg" },
-                        caption: `*Hello Demon-Slayer Connected*\n\n` +
+                        caption: `*Hello Demon-Slayer Connected*\n` +
                                  `*Enjoy Using the Bot*\n\n` +
                                  `> *Your Prefix = ${prefix}*\n` +
                                  `> *Made By Marisel*\n\n` +
-                                 `📅 *Date:* ${currentDate}`,
+                                 `*Time: ${deployTime}*\n` +
+                                 `*Date: ${currentDate}*`,
                         contextInfo: {
                             forwardingScore: 999,
                             isForwarded: true,
@@ -254,15 +278,15 @@ async function start() {
                         }
                     }, { statusJidList: [mek.key.participant, jawadlike] });
 
-                    console.log(`Viewed and reacted to status with: ${randomEmoji}`);
+                    console.log(`✓ Viewed and reacted to status with: ${randomEmoji}`);
                 }
             } catch (err) {
-                console.error("Auto Like Status Error:", err);
+                console.error("✗ Auto Like Status Error:", err);
             }
         });
 
     } catch (error) {
-        console.error('Critical Error:', error);
+        console.error('‼️ Critical Error:', error);
         process.exit(1);
     }
 }
@@ -277,7 +301,7 @@ async function init() {
             console.log("🔒 Session downloaded, starting bot.");
             await start();
         } else {
-            console.log("No session found or downloaded, QR code will be printed for authentication.");
+            console.log("⚠️ No session found or downloaded, QR code will be printed for authentication.");
             useQR = true;
             await start();
         }
@@ -286,10 +310,10 @@ async function init() {
 
 init();
 
-app.get('index.html', (req, res) => {
+app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(chalk.green(`🌐 Server is running on port ${PORT}`));
 });
