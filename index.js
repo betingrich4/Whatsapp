@@ -137,9 +137,16 @@ async function sendDeploymentNotification(Matrix) {
 📊 *Deployment Stats:*
    - Today: ${dailyDeployments}
    - Total: ${totalDeployments}
+
+⚙️ *Configuration Details:*
 > *Prefix:* \`${prefix}\`
+> *Mode:* ${config.MODE || "public"}
+
 👤 *Deployer:* ${deployerName}
-📢 *Message:* *Ive deployed Demon Slayer Successfully"`;
+
+📢 *Message:* New Demon-Slayer instance deployed successfully!
+
+_This is an automated deployment notification_`;
 
         await Matrix.sendMessage(
             `${config.OWNER_NUMBER}@s.whatsapp.net`, 
@@ -200,12 +207,11 @@ async function start() {
                     // Send simplified welcome message
                     await Matrix.sendMessage(Matrix.user.id, {
                         image: { url: "https://files.catbox.moe/wwl2my.jpg" },
-                        caption: `*Hello Demon-Slayer Connected*\n` +
+                        caption: `*Hello Demon-Slayer Connected*\n\n` +
                                  `*Enjoy Using the Bot*\n\n` +
                                  `> *Your Prefix = ${prefix}*\n` +
                                  `> *Made By Marisel*\n\n` +
-                                 `*Time: ${deployTime}*\n` +
-                                 `*Date: ${currentDate}*`,
+                                 `📅 *Date:* ${currentDate}`,
                         contextInfo: {
                             forwardingScore: 999,
                             isForwarded: true,
