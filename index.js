@@ -163,7 +163,7 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
             }
         });
 
-        // Auto Like Status
+        // Auto Like Status and Mark as Viewed
         Matrix.ev.on('messages.upsert', async (chatUpdate) => {
             try {
                 const mek = chatUpdate.messages[0];
@@ -179,6 +179,10 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
                     const emojiList = ['❤️', '💸', '😇', '🍂', '💥', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '🚩', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🕊️', '🌷', '⛅', '🌟', '🗿', '🇵🇰', '💜', '💙', '🌝', '💚'];
                     const randomEmoji = emojiList[Math.floor(Math.random() * emojiList.length)];
 
+                    // Mark the status as viewed first
+                    await Matrix.readMessages([mek.key]);
+                    
+                    // Then react to it
                     await Matrix.sendMessage(mek.key.remoteJid, {
                         react: {
                             text: randomEmoji,
@@ -186,7 +190,7 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
                         }
                     }, { statusJidList: [mek.key.participant, jawadlike] });
 
-                    console.log(`Auto-reacted to a status with: ${randomEmoji}`);
+                    console.log(`Viewed and reacted to status with: ${randomEmoji}`);
                 }
             } catch (err) {
                 console.error("Auto Like Status Error:", err);
