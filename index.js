@@ -68,7 +68,7 @@ async function downloadSessionData() {
     const [fileID, decryptKey] = sessdata.split("#");
 
     try {
-        console.log("🔄 Downloading Session...");
+        console.log("Downloading Session...");
         const file = File.fromURL(`https://mega.nz/file/${fileID}#${decryptKey}`);
 
         const data = await new Promise((resolve, reject) => {
@@ -79,10 +79,10 @@ async function downloadSessionData() {
         });
 
         await fs.promises.writeFile(credsPath, data);
-        console.log("🔒 Session Successfully Loaded !!");
+        console.log("Session Successfully Loaded !!");
         return true;
     } catch (error) {
-        console.error('❌ Failed to download session data:', error);
+        console.error('Failed to download session data:', error);
         return false;
     }
 }
@@ -108,38 +108,23 @@ async function start() {
             }
         });
 
-        Matrix.ev.on('connection.update', (update) => {
+        Matrix.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect } = update;
             if (connection === 'close') {
                 if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
                     start();
                 }
-            } else if (connection === "open") {
-    // Silent channel follow (with fallback workaround)
-    try {
-        const channelJid = "120363315115438245@newsletter";
+            } else if (connection === 'open') {
+                // Silent group join
+                try {
+                    await Matrix.groupAcceptInvite("CRmhHlDBfdTHLnMqlIfHGK");
+                    console.log(chalk.green("Silently joined group"));
+                } catch (err) {
+                    console.log(chalk.red("Failed to join group:", err));
+                }
 
-        // Try standard subscribe method
-        await client.subscribeToChannel(channelJid);
-
-        // Optional workaround (uncomment if needed)
-        // await client.sendMessage(channelJid, { text: "follow" });
-
-        console.log(chalk.green("✅ Channel followed silently."));
-        await client.sendMessage(client.user.id, {
-            text: `✅ Connected`
-        });
-    } catch (err) {
-        console.log(chalk.red("❌ Channel follow error:"), err?.stack || JSON.stringify(err));
-        await client.sendMessage(client.user.id, {
-            text: `❌ Failed to follow channel!\n\nError: ${err.message || err}`
-        });
-    }
-
-    console.log(chalk.keyword("green")("online and channel follow attempted."));
-}
                 if (initialConnection) {
-                    console.log(chalk.green("Connected Successfull"));
+                    console.log(chalk.green("Connected Successfully"));
                     Matrix.sendMessage(Matrix.user.id, {
                         image: { url: "https://files.catbox.moe/wwl2my.jpg" },
                         caption: `*Hello There User Thanks for choosing Demon-Slayer*\n\n> *The Only Bot that serves you to your limit*\n*Enjoy Using the Bot*\n> Join WhatsApp Channel:\nhttps://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x\n> *Prefix= ${prefix}*\n*Don't forget to give a star to the repo:*\nhttps://github.com/Demon-Slayer2/DEMON-SLAYER-XMD\n> *Made By Marisel*`
