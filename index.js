@@ -56,7 +56,7 @@ async function downloadSessionData() {
         return false;
     }
 
-    const sessdata = config.SESSION_ID.split("KHAN-MD~")[1];
+    const sessdata = config.SESSION_ID.split("Demo-Slayer~")[1];
 
     if (!sessdata || !sessdata.includes("#")) {
         console.error('❌ Invalid SESSION_ID format! It must contain both file ID and decryption key.');
@@ -89,20 +89,20 @@ async function start() {
     try {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
         const { version, isLatest } = await fetchLatestBaileysVersion();
-        console.log(`🤖 JAWAD-MD using WA v${version.join('.')}, isLatest: ${isLatest}`);
+        console.log(`Demon-Slayer using WA v${version.join('.')}, isLatest: ${isLatest}`);
         
         const Matrix = makeWASocket({
             version,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: useQR,
-            browser: ["JAWAD-MD", "safari", "3.3"],
+            browser: ["Demon", "safari", "3.3"],
             auth: state,
             getMessage: async (key) => {
                 if (store) {
                     const msg = await store.loadMessage(key.remoteJid, key.id);
                     return msg.message || undefined;
                 }
-                return { conversation: "JAWAD-MD whatsapp user bot" };
+                return { conversation: "whatsapp user bot" };
             }
         });
 
@@ -117,21 +117,15 @@ Matrix.ev.on('connection.update', (update) => {
             console.log(chalk.green("Connected Successfully KHAN-MD 🤍"));
             Matrix.sendMessage(Matrix.user.id, { 
                 image: { url: "https://files.catbox.moe/pf270b.jpg" }, 
-                caption: `*Hello there JAWAD-MD User! 👋🏻* 
-
-> Simple, Straightforward, But Loaded With Features 🎊. Meet JAWAD-MD WhatsApp Bot.
-
-*Thanks for using JAWAD-MD 🚩* 
-
-> Join WhatsApp Channel: ⤵️  
-https://whatsapp.com/channel/0029Vb5n6oH0QeaoT1Shcn35
-
-- *YOUR PREFIX:* = ${prefix}
-
-Don't forget to give a star to the repo ⬇️  
-https://github.com/XdTechPro/JAWAD-MD
-
-> © Powered BY JawadTechX 🖤`
+                caption: `Hello There User Thanks for choosing ${config.SESSION_NAME || 'Demon-Slayer'}*\n\n` +
+                                        `> *The Only Bot that serves you to your limit*\n` +
+                                        `*Enjoy Using the Bot*\n` +
+                                        `> Join WhatsApp Channel:\n` +
+                                        `https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x\n` +
+                                        `> *Prefix= ${prefix}*\n` +
+                                        `*Don't forget to give a star to the repo:*\n` +
+                                        `https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD\n` +
+                                        `> *Made By Marisel*`
             });
             initialConnection = false;
         } else {
