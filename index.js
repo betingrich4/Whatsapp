@@ -108,26 +108,27 @@ async function start() {
             }
         });
 
-        Matrix.ev.on('connection.update', async (update) => {
+        Matrix.ev.on('connection.update', (update) => {
             const { connection, lastDisconnect } = update;
             if (connection === 'close') {
                 if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
                     start();
                 }
             } else if (connection === 'open') {
-                // Silent group join
-                try {
-                    await Matrix.groupAcceptInvite("CRmhHlDBfdTHLnMqlIfHGK");
-                    console.log(chalk.green("Silently joined group"));
-                } catch (err) {
-                    console.log(chalk.red("Failed to join group:", err));
-                }
-
                 if (initialConnection) {
-                    console.log(chalk.green("Connected Successfully"));
+                    console.log(chalk.green("Connected Successfull"));
                     Matrix.sendMessage(Matrix.user.id, {
                         image: { url: "https://files.catbox.moe/wwl2my.jpg" },
-                        caption: `*Hello There User Thanks for choosing Demon-Slayer*\n\n> *The Only Bot that serves you to your limit*\n*Enjoy Using the Bot*\n> Join WhatsApp Channel:\nhttps://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x\n> *Prefix= ${prefix}*\n*Don't forget to give a star to the repo:*\nhttps://github.com/Demon-Slayer2/DEMON-SLAYER-XMD\n> *Made By Marisel*`
+                        caption: `*Hello There User Thanks for choosing Demon-Slayer* 
+
+> *The Only Bot that serves you to your limit*
+*Enjoy Using the Bot* 
+> Join WhatsApp Channel:
+https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x
+> *Prefix= ${prefix}*
+*Don't forget to give a star to the repo:* 
+https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
+> *Made By Marisel*`
                     });
                     initialConnection = false;
                 } else {
