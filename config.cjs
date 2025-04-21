@@ -13,6 +13,7 @@ const config = {
   BOT_STATUS: process.env.BOT_STATUS || "online",
   CAPTION: process.env.CAPTION || "Made By Marisel",
   OWNER_NAME: process.env.OWNER_NAME || "Marisel",
+  TIME_ZONE: process.env.TIME_ZONE || "Africa/Nairobi", // Timezone for timestamps
   
   /* [OWNER CONFIGURATION] */
   OWNER_NUMBER: process.env.OWNER_NUMBER || "218942841878",
