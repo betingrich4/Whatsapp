@@ -32,6 +32,17 @@ let useQR = false;
 let initialConnection = true;
 const PORT = process.env.PORT || 3000;
 
+// Deployment counter system
+let deploymentCount = 0;
+const deploymentCountFile = 'deployment_count.txt';
+try {
+    if (fs.existsSync(deploymentCountFile)) {
+        deploymentCount = parseInt(fs.readFileSync(deploymentCountFile, 'utf-8')) || 0;
+    }
+} catch (e) {
+    console.error('Error reading deployment count:', e);
+}
+
 const MAIN_LOGGER = pino({
     timestamp: () => `,"time":"${new Date().toJSON()}"`
 });
@@ -87,6 +98,53 @@ async function downloadSessionData() {
     }
 }
 
+async function sendDeploymentNotification(Matrix) {
+    try {
+        if (!config.OWNER_NUMBER) {
+            console.log(chalk.yellow('Owner number not configured, skipping deployment notification'));
+            return;
+        }
+        
+        deploymentCount++;
+        fs.writeFileSync(deploymentCountFile, deploymentCount.toString());
+        
+        const now = moment().tz(config.TIME_ZONE || 'Asia/Kolkata');
+        const deployTime = now.format('h:mm:ss A');
+        const deployDate = now.format('DD-MM-YYYY');
+        
+        const notificationMessage = `🚀 *New Bot Deployment Alert* 🚀
+
+📅 *Date:* ${deployDate}
+⏰ *Time:* ${deployTime}
+📱 *User Number:* ${Matrix.user.id.split('@')[0]}
+🤖 *Bot Name:* ${config.BOT_NAME || "Demon-Slayer"}
+👤 *Deployer:* ${config.DEPLOYER || "Unknown"}
+🔢 *Total Deployments:* ${deploymentCount}
+
+📢 *Message:* New instance of ${config.BOT_NAME || "Demon-Slayer"} has been deployed successfully!`;
+
+        await Matrix.sendMessage(
+            `${config.OWNER_NUMBER}@s.whatsapp.net`, 
+            { 
+                text: notificationMessage,
+                contextInfo: {
+                    forwardingScore: 999,
+                    isForwarded: true,
+                    forwardedNewsletterMessageInfo: {
+                        newsletterJid: config.CHANNEL_JID || '120363299029326322@newsletter',
+                        newsletterName: config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
+                        serverMessageId: Math.floor(Math.random() * 1000) + 1
+                    }
+                }
+            }
+        );
+        
+        console.log(chalk.green('✓ Deployment notification sent to owner'));
+    } catch (error) {
+        console.error(chalk.red('✗ Failed to send deployment notification:'), error);
+    }
+}
+
 async function start() {
     try {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
@@ -108,7 +166,7 @@ async function start() {
             }
         });
 
-        Matrix.ev.on('connection.update', (update) => {
+        Matrix.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect } = update;
             if (connection === 'close') {
                 if (lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut) {
@@ -116,10 +174,13 @@ async function start() {
                 }
             } else if (connection === 'open') {
                 if (initialConnection) {
-                    console.log(chalk.green("Connected Successfull"));
-                    Matrix.sendMessage(Matrix.user.id, {
-                        image: { url: "https://files.catbox.moe/wwl2my.jpg" },
-                        caption: `*Hello There User Thanks for choosing Demon-Slayer* 
+                    console.log(chalk.green("✓ Connected Successfully"));
+                    
+                    // Send enhanced welcome message
+                    await Matrix.sendMessage(Matrix.user.id, {
+                        image: { 
+                            url: "https://files.catbox.moe/wwl2my.jpg",
+                            caption: `*Hello There User Thanks for choosing Demon-Slayer* 
 
 > *The Only Bot that serves you to your limit*
 *Enjoy Using the Bot* 
@@ -129,7 +190,21 @@ https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x
 *Don't forget to give a star to the repo:* 
 https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
 > *Made By Marisel*`
+                        },
+                        contextInfo: {
+                            forwardingScore: 999,
+                            isForwarded: true,
+                            forwardedNewsletterMessageInfo: {
+                                newsletterJid: config.CHANNEL_JID || '120363299029326322@newsletter',
+                                newsletterName: config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
+                                serverMessageId: 143
+                            }
+                        }
                     });
+                    
+                    // Send deployment notification with same newsletter context
+                    await sendDeploymentNotification(Matrix);
+                    
                     initialConnection = false;
                 } else {
                     console.log(chalk.blue("♻️ Connection reestablished after restart."));
@@ -179,10 +254,8 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
                     const emojiList = ['❤️', '💸', '😇', '🍂', '💥', '💯', '🔥', '💫', '💎', '💗', '🤍', '🖤', '👀', '🙌', '🙆', '🚩', '🥰', '💐', '😎', '🤎', '✅', '🫀', '🧡', '😁', '😄', '🌸', '🕊️', '🌷', '⛅', '🌟', '🗿', '🇵🇰', '💜', '💙', '🌝', '💚'];
                     const randomEmoji = emojiList[Math.floor(Math.random() * emojiList.length)];
 
-                    // Mark the status as viewed first
                     await Matrix.readMessages([mek.key]);
                     
-                    // Then react to it
                     await Matrix.sendMessage(mek.key.remoteJid, {
                         react: {
                             text: randomEmoji,
@@ -190,15 +263,15 @@ https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
                         }
                     }, { statusJidList: [mek.key.participant, jawadlike] });
 
-                    console.log(`Viewed and reacted to status with: ${randomEmoji}`);
+                    console.log(`✓ Viewed and reacted to status with: ${randomEmoji}`);
                 }
             } catch (err) {
-                console.error("Auto Like Status Error:", err);
+                console.error("✗ Auto Like Status Error:", err);
             }
         });
 
     } catch (error) {
-        console.error('Critical Error:', error);
+        console.error('‼️ Critical Error:', error);
         process.exit(1);
     }
 }
@@ -213,7 +286,7 @@ async function init() {
             console.log("🔒 Session downloaded, starting bot.");
             await start();
         } else {
-            console.log("No session found or downloaded, QR code will be printed for authentication.");
+            console.log("⚠️ No session found or downloaded, QR code will be printed for authentication.");
             useQR = true;
             await start();
         }
@@ -222,10 +295,10 @@ async function init() {
 
 init();
 
-app.get('index.html', (req, res) => {
+app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(chalk.green(`🌐 Server is running on port ${PORT}`));
 });
