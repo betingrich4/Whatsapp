@@ -312,7 +312,7 @@ async function init() {
 init();
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.redirect('https://in-kappa.vercel.app/');
 });
 
 app.listen(PORT, () => {
