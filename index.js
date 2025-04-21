@@ -52,14 +52,14 @@ async function downloadSessionData() {
     console.log("Debugging SESSION_ID:", config.SESSION_ID);
 
     if (!config.SESSION_ID) {
-        console.error('❌ Please add your session to SESSION_ID env !!');
+        console.error('Please add your session to SESSION_ID env !!');
         return false;
     }
 
     const sessdata = config.SESSION_ID.split("Demo-Slayer~")[1];
 
     if (!sessdata || !sessdata.includes("#")) {
-        console.error('❌ Invalid SESSION_ID format! It must contain both file ID and decryption key.');
+        console.error('Invalid SESSION_ID format! It must contain both file ID and decryption key.');
         return false;
     }
 
@@ -89,13 +89,13 @@ async function start() {
     try {
         const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
         const { version, isLatest } = await fetchLatestBaileysVersion();
-        console.log(`Demon-Slayer using WA v${version.join('.')}, isLatest: ${isLatest}`);
+        console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`);
         
         const Matrix = makeWASocket({
             version,
             logger: pino({ level: 'silent' }),
             printQRInTerminal: useQR,
-            browser: ["Demon", "safari", "3.3"],
+            browser: ["JAWAD-MD", "safari", "3.3"],
             auth: state,
             getMessage: async (key) => {
                 if (store) {
@@ -114,18 +114,19 @@ Matrix.ev.on('connection.update', (update) => {
         }
     } else if (connection === 'open') {
         if (initialConnection) {
-            console.log(chalk.green("Connected Successfully KHAN-MD 🤍"));
+            console.log(chalk.green("Connected Successfully"));
             Matrix.sendMessage(Matrix.user.id, { 
-                image: { url: "https://files.catbox.moe/pf270b.jpg" }, 
-                caption: `Hello There User Thanks for choosing ${config.SESSION_NAME || 'Demon-Slayer'}*\n\n` +
-                                        `> *The Only Bot that serves you to your limit*\n` +
-                                        `*Enjoy Using the Bot*\n` +
-                                        `> Join WhatsApp Channel:\n` +
-                                        `https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x\n` +
-                                        `> *Prefix= ${prefix}*\n` +
-                                        `*Don't forget to give a star to the repo:*\n` +
-                                        `https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD\n` +
-                                        `> *Made By Marisel*`
+                image: { url: "https://files.catbox.moe/wwl2my.jpg" }, 
+                caption: `*Hello There User Thanks for choosing Demon-Slayer* 
+
+> *The Only Bot that serves you to your limit*
+*Enjoy Using the Bot* 
+> Join WhatsApp Channel:
+https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x
+> *Prefix= ${prefix}*
+*Don't forget to give a star to the repo:* 
+https://github.com/Demon-Slayer2/DEMON-SLAYER-XMD
+> *Made By Marisel*`
             });
             initialConnection = false;
         } else {
@@ -173,7 +174,7 @@ Matrix.ev.on('connection.update', (update) => {
             await Matrix.readMessages([mek.key]);
             
             if (config.AUTO_STATUS_REPLY) {
-                const customMessage = config.STATUS_READ_MSG || '✅ Auto Status Seen Bot By JAWAD-MD';
+                const customMessage = config.STATUS_READ_MSG || '✅ Auto Status Seen Bot';
                 await Matrix.sendMessage(fromJid, { text: customMessage }, { quoted: mek });
             }
         }
@@ -216,3 +217,4 @@ app.listen(PORT, () => {
 });
 
 
+    
