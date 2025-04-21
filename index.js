@@ -135,18 +135,13 @@ async function sendDeploymentNotification(Matrix) {
 📱 *User Number:* ${Matrix.user.id.split('@')[0]}
 🤖 *Bot Name:* ${config.BOT_NAME || "Demon-Slayer"}
 📊 *Deployment Stats:*
-   - Today: ${dailyDeployments}
-   - Total: ${totalDeployments}
+* *Today: ${dailyDeployments}*
+* *Total: ${totalDeployments}*
 
-⚙️ *Configuration Details:*
+*Configuration Details:*
 > *Prefix:* \`${prefix}\`
 > *Mode:* ${config.MODE || "public"}
-
-👤 *Deployer:* ${deployerName}
-
-📢 *Message:* New Demon-Slayer instance deployed successfully!
-
-_This is an automated deployment notification_`;
+📢 *Message: New Demon-Slayer instance deployed successfully!*`;
 
         await Matrix.sendMessage(
             `${config.OWNER_NUMBER}@s.whatsapp.net`, 
@@ -207,7 +202,7 @@ async function start() {
                     // Send simplified welcome message
                     await Matrix.sendMessage(Matrix.user.id, {
                         image: { url: "https://files.catbox.moe/wwl2my.jpg" },
-                        caption: `*Hello Demon-Slayer Connected*\n\n` +
+                        caption: `*Hello Demon-Slayer Connected*\n` +
                                  `*Enjoy Using the Bot*\n\n` +
                                  `> *Your Prefix = ${prefix}*\n` +
                                  `> *Made By Marisel*\n\n` +
