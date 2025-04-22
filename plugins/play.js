@@ -16,7 +16,7 @@ const playHandler = async (m, sock) => {
     const cmd = body.slice(prefix.length).split(' ')[0].toLowerCase();
     const text = body.slice(prefix.length + cmd.length).trim();
 
-    if (cmd === "song") {
+    if (cmd === "play") {
       if (!text) {
         await sock.sendMessage(m.from, { text: "🎶 Oops! Please provide a song name or artist! 💖" }, { quoted: m });
         await m.React('❌');
