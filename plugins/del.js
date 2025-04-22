@@ -12,50 +12,36 @@ const deleteMessage = async (m, gss) => {
 
     if (validCommands.includes(cmd)) {
       if (!isCreator) {
-        await gss.sendMessage(m.from, { delete: m.key }); // Delete the unauthorized command
-        return m.reply("*OWNER COMMAND*");
+        await gss.sendMessage(m.from, { delete: m.key });
+        return;
       }
 
       if (!m.quoted) {
-        await gss.sendMessage(m.from, { delete: m.key }); // Delete the invalid command
-        return m.reply('Reply to the message you want to delete');
+        await gss.sendMessage(m.from, { delete: m.key });
+        return;
       }
 
-      // Delete the target message
-      const targetKey = {
-        remoteJid: m.from,
-        id: m.quoted.key.id,
-        participant: m.quoted.key.participant || m.quoted.key.remoteJid
-      };
-
-      // Delete the command message
-      const commandKey = {
-        remoteJid: m.from,
-        id: m.key.id,
-        participant: m.key.participant || m.key.remoteJid
-      };
-
-      // Perform deletions
+      // Delete both the quoted message and the command silently
       await Promise.all([
-        gss.sendMessage(m.from, { delete: targetKey }),
-        gss.sendMessage(m.from, { delete: commandKey })
+        gss.sendMessage(m.from, { 
+          delete: {
+            remoteJid: m.from,
+            id: m.quoted.key.id,
+            participant: m.quoted.key.participant || m.quoted.key.remoteJid
+          }
+        }),
+        gss.sendMessage(m.from, { 
+          delete: {
+            remoteJid: m.from,
+            id: m.key.id,
+            participant: m.key.participant || m.key.remoteJid
+          }
+        })
       ]);
-
-      // Send confirmation (this will remain visible)
-      await gss.sendMessage(
-        m.from, 
-        { text: 'Message deleted successfully' },
-        { quoted: m }
-      );
     }
   } catch (error) {
     console.error('Error deleting message:', error);
-    try {
-      await gss.sendMessage(m.from, { delete: m.key }); // Try to delete the failed command
-    } catch (e) {
-      console.error('Failed to delete command:', e);
-    }
-    m.reply('An error occurred while trying to delete the message.');
+    // No error message will be sent
   }
 };
 
