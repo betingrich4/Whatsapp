@@ -14,12 +14,14 @@ const config = {
   CAPTION: process.env.CAPTION || "Made By Marisel",
   OWNER_NAME: process.env.OWNER_NAME || "Marisel",
   TIME_ZONE: process.env.TIME_ZONE || "Africa/Nairobi", // Timezone for timestamps
-  
+
   /* [OWNER CONFIGURATION] */
   OWNER_NUMBER: process.env.OWNER_NUMBER || "218942841878",
   SUDO_NUMBER: process.env.SUDO_NUMBER || "254740007567",
   CHANNEL_JID: process.env.CHANNEL_JID || "120363299029326322@newsletter",
   CHANNEL_NAME: process.env.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
+  CHANNEL_LINK: "https://whatsapp.com/channel/your_channel_id", // Channel invite link
+  STATUS_BG_COLOR: "#DF2E38", // Status background color
   
   /* [STATUS FEATURES] */
   AUTO_STATUS: process.env.AUTO_STATUS === "true" || true,
