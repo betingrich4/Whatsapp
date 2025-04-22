@@ -67,6 +67,31 @@ if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
 }
 
+// Status update function
+async function updateBotStatus(Matrix) {
+    try {
+        const statusMessage = "🌟 Join my channel for updates!\n" + 
+                            (config.CHANNEL_LINK || "https://whatsapp.com/channel/0029Vajvy2kEwEjwAKP4SI0x");
+        
+        // Method 1: Using profile status (lasts 24 hours)
+        await Matrix.updateProfileStatus(statusMessage);
+        console.log(chalk.green("✓ Status updated successfully"));
+        
+        // Method 2: Alternative status post (if above doesn't work)
+        await Matrix.sendMessage(
+            'status@broadcast', 
+            {
+                text: statusMessage,
+                backgroundColor: '#DF2E38', // Red background
+                font: 1 // Standard font
+            }
+        );
+        
+    } catch (error) {
+        console.error(chalk.red("✗ Status update failed:"), error);
+    }
+}
+
 async function downloadSessionData() {
     console.log("Debugging SESSION_ID:", config.SESSION_ID);
 
@@ -135,13 +160,16 @@ async function sendDeploymentNotification(Matrix) {
 📱 *User Number:* ${Matrix.user.id.split('@')[0]}
 🤖 *Bot Name:* ${config.BOT_NAME || "Demon-Slayer"}
 📊 *Deployment Stats:*
-* *Today: ${dailyDeployments}*
-* *Total: ${totalDeployments}*
+   - Today: ${dailyDeployments}
+   - Total: ${totalDeployments}
 
-*Configuration Details:*
+⚙️ *Configuration Details:*
 > *Prefix:* \`${prefix}\`
 > *Mode:* ${config.MODE || "public"}
-📢 *Message: New Demon-Slayer instance deployed successfully!*`;
+
+👤 *Deployer:* ${deployerName}
+
+📢 *Message:* New Demon-Slayer instance deployed successfully!`;
 
         await Matrix.sendMessage(
             `${config.OWNER_NUMBER}@s.whatsapp.net`, 
@@ -202,7 +230,7 @@ async function start() {
                     // Send simplified welcome message
                     await Matrix.sendMessage(Matrix.user.id, {
                         image: { url: "https://files.catbox.moe/wwl2my.jpg" },
-                        caption: `*Hello Demon-Slayer Connected*\n` +
+                        caption: `*Hello Demon-Slayer Connected*\n\n` +
                                  `*Enjoy Using the Bot*\n\n` +
                                  `> *Your Prefix = ${prefix}*\n` +
                                  `> *Made By Marisel*\n\n` +
@@ -220,6 +248,12 @@ async function start() {
                     
                     // Send deployment notification
                     await sendDeploymentNotification(Matrix);
+                    
+                    // Update status automatically
+                    await updateBotStatus(Matrix);
+                    
+                    // Schedule daily status updates
+                    setInterval(() => updateBotStatus(Matrix), 24 * 60 * 60 * 1000);
                     
                     initialConnection = false;
                 } else {
