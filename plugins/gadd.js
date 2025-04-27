@@ -11,8 +11,8 @@ const newsletterContext = {
     forwardingScore: 999,
     isForwarded: true,
     forwardedNewsletterMessageInfo: {
-        newsletterJid: config.CHANNEL_JID || '120363354023106228@newsletter',
-        newsletterName: config.CHANNEL_NAME || '𝖊𝖑𝖎𝖆𝖐𝖎𝖒 𝖝𝖒𝖉',
+        newsletterJid: config.CHANNEL_JID || '120363299029326322@newsletter',
+        newsletterName: config.CHANNEL_NAME || '𝖒𝖆𝖗𝖎𝖘𝖊𝖑',
         serverMessageId: 143
     }
 };
@@ -47,7 +47,7 @@ ${fullCode.length > 3900 ? fullCode.substring(0, 3900) + "\n\n// ... (truncated)
 \`\`\`
 ╰──────────⊷  
 ⚡ Full file sent below 📂  
-${config.CHANNEL_NAME || 'Marisel'}* 💜`;
+${config.CHANNEL_NAME || '𝖒𝖆𝖗𝖎𝖘𝖊𝖑'}* 💜`;
 
         // Send preview
         await conn.sendMessage(from, { 
