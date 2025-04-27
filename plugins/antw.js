@@ -1,26 +1,26 @@
-// badwords.js
 import config from "../config.cjs";
 
 const antiwordDB = new Map(); // { groupJid: { active: boolean, bannedWords: Set<string>, strictMode: boolean } }
 const warnedUsersDB = new Map(); // { groupJid: Map<userJid, {count: number, lastWarning: Date}> }
 
-// Enhanced bad words list (English + Sinhala/Tamil)
+// Default banned words list (English + common bypass attempts)
 const DEFAULT_BANNED_WORDS = new Set([
-  // English profanity
-  'fuck', 'shit', 'asshole', 'bitch', 'cunt', 'dick', 'piss', 'cock', 'pussy', 
-  'whore', 'slut', 'bastard', 'motherfucker', 'douche', 'fag', 'retard',
-  'nigger', 'nigga', 'wtf', 'xxx', 'sex', 'porn', 'rape', 'pedo', 'incest',
+  // Profanity
+  'fuck', 'shit', 'asshole', 'bitch', 'cunt', 'dick', 'piss', 'cock', 'pussy', 'whore',
+  'slut', 'bastard', 'motherfucker', 'douche', 'fag', 'retard', 'nigger', 'nigga',
   
-  // Sinhala/Tamil profanity
-  'huththa', 'pakaya', 'ponnaya', 'hutto', 'mia', 'balla', 'naraka', 'kella',
-  'gona', 'pako', 'thopa', 'kudda', 'kussi', 'kota', 'lansi', 'lansi',
-  'bithara', 'biththara', 'bunnia', 'bunniah', 'modaya', 'moodaya', 'meka',
-  'moko', 'mokadda', 'punnakku', 'parippu', 'kondamma', 'kondammah',
+  // Sexual terms
+  'sex', 'porn', 'rape', 'pedo', 'incest', 'orgasm', 'masturbat', 'blowjob', 'dildo',
   
-  // Bypass attempts
-  'f u c k', 's h i t', 'f*ck', 'sh!t', 'b!tch', '@$$', '5hit', 'fuk', 'fuq',
-  'wtff', 'xxx', 'sexx', 's e x', 'p o r n', 'h u t h t h a', 'p a k a y a',
-  'h u t t o', 'p o n n a y a'
+  // Hate speech
+  'kill', 'murder', 'terrorist', 'hitler', 'nazi', 'racist', 'kkk', 'islamophob',
+  
+  // Drugs
+  'cocaine', 'heroin', 'meth', 'lsd', 'ecstasy', 'weed', 'marijuana', 'opium',
+  
+  // Bypass attempts (e.g., F*ck, F u c k)
+  'f u c k', 's h i t', 'f*ck', 'sh!t', 'b!tch', '@$$', '5hit', 'fuk', 'fvck', 'f.uck', 
+  'f@ck', 'f!ck', 'biatch', 'b1tch', 'b*tch', '$hit', 'sh1t', 's.h.i.t', 'f.u.c.k'
 ]);
 
 const antiword = async (m, gss) => {
@@ -50,66 +50,130 @@ const antiword = async (m, gss) => {
       warnedUsersDB.set(m.from, new Map());
       
       return m.reply(
-        `*Antiword activated!*\n` +
-        `> Mode: ${cmd.includes('-strict') ? 'STRICT' : 'NORMAL'}\n` +
-        `> Banned words: ${bannedWords.size}\n` +
-        `> Custom words: ${words.length > 0 ? words.join(', ') : 'None'}`
+        `*Antiword activated!*\n\n` +
+        `> *Mode:* ${cmd.includes('-strict') ? 'STRICT (delete all messages)' : 'NORMAL (filter bad words)'}\n` +
+        `> *Banned words:* ${bannedWords.size}\n` +
+        `> *Custom words added:* ${words.length > 0 ? words.join(', ') : 'None'}`
       );
     }
 
     // Disable antiword
     if (cmd === "antiword off") {
-      if (!m.isGroup) return m.reply("*Group command only*");
+      if (!m.isGroup) return m.reply("*Command only for groups!*");
 
       const groupMetadata = await gss.groupMetadata(m.from);
       const senderAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin;
 
       if (!senderAdmin && m.sender !== config.OWNER_NUMBER + '@s.whatsapp.net') {
-        return m.reply("*Admin command only*");
+        return m.reply("*Only admins can disable antiword!*");
       }
 
       antiwordDB.delete(m.from);
       warnedUsersDB.delete(m.from);
-      return m.reply("*Antiword disabled*");
+      return m.reply("*Antiword is now disabled.*");
     }
 
-    // Message filtering
+    // Add words to filter
+    if (cmd.startsWith("antiword add")) {
+      if (!m.isGroup) return m.reply("*Command only for groups!*");
+
+      const groupMetadata = await gss.groupMetadata(m.from);
+      const senderAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin;
+
+      if (!senderAdmin && m.sender !== config.OWNER_NUMBER + '@s.whatsapp.net') {
+        return m.reply("*Only admins can modify banned words!*");
+      }
+
+      const wordsToAdd = cmd.split(' ').slice(2);
+      if (wordsToAdd.length === 0) {
+        return m.reply("*Please specify words to add*\nExample: *antiword add scam spam*");
+      }
+
+      const groupData = antiwordDB.get(m.from) || { 
+        active: true, 
+        bannedWords: new Set([...DEFAULT_BANNED_WORDS]),
+        strictMode: false
+      };
+      
+      wordsToAdd.forEach(word => groupData.bannedWords.add(word.toLowerCase()));
+      antiwordDB.set(m.from, groupData);
+      
+      return m.reply(
+        `*Added ${wordsToAdd.length} word(s) to filter*\n\n` +
+        `> New words: ${wordsToAdd.join(', ')}\n` +
+        `> Total banned words: ${groupData.bannedWords.size}`
+      );
+    }
+
+    // List banned words
+    if (cmd === "antiword list") {
+      if (!m.isGroup) return m.reply("*Command only for groups!*");
+
+      const groupMetadata = await gss.groupMetadata(m.from);
+      const senderAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin;
+
+      if (!senderAdmin && m.sender !== config.OWNER_NUMBER + '@s.whatsapp.net') {
+        return m.reply("*Only admins can view banned words!*");
+      }
+
+      const groupData = antiwordDB.get(m.from);
+      if (!groupData?.active) {
+        return m.reply("*Antiword is not active in this group*");
+      }
+
+      const words = [...groupData.bannedWords].slice(0, 50);
+      return m.reply(
+        `*Banned Words List (${groupData.bannedWords.size})*\n\n` +
+        `> ${words.join(', ')}${groupData.bannedWords.size > 50 ? '\n> ...and more' : ''}`
+      );
+    }
+
+    // Message filtering with deletion
     if (antiwordDB.get(m.from)?.active && (m.mtype === 'conversation' || m.mtype === 'extendedTextMessage')) {
       const groupMetadata = await gss.groupMetadata(m.from);
       const senderAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin;
       
-      // Skip if admin or owner
+      // Skip if admin or bot owner
       if (senderAdmin || m.sender === config.OWNER_NUMBER + '@s.whatsapp.net') return;
 
       const groupData = antiwordDB.get(m.from);
       const messageText = m.mtype === 'extendedTextMessage' ? m.message.extendedTextMessage.text : m.body;
       const lowerText = messageText.toLowerCase();
 
-      // Strict mode - delete all messages
+      // Strict mode - delete ALL messages
       if (groupData.strictMode) {
         await gss.sendMessage(m.from, { delete: m.key });
         return m.reply(
-          `*@${m.sender.split('@')[0]} - Strict mode active!*`,
+          `*@${m.sender.split('@')[0]} - Strict mode active!*\n> All messages are automatically deleted`,
           null,
           { mentions: [m.sender] }
         );
       }
 
-      // Check for banned words
-      const foundWords = [...groupData.bannedWords].filter(word => 
-        lowerText.includes(word) || 
-        new RegExp(word.split('').join('[\\s\\W]*')).test(lowerText)
-      );
+      // Normal mode - check for banned words
+      const foundWords = [...groupData.bannedWords].filter(word => {
+        const regex = new RegExp(
+          word.split('').join('[\\s\\W]*').replace(/\*/g, '\\*'), 
+          'i' // Case-insensitive
+        );
+        return regex.test(lowerText);
+      });
 
       if (foundWords.length > 0) {
-        // Delete message
+        // 1. Check if bot is admin (required to delete messages)
+        const botAdmin = groupMetadata.participants.find(p => p.id === gss.user.id)?.admin;
+        if (!botAdmin) {
+          return m.reply("*⚠️ I need admin rights to delete messages!*");
+        }
+
+        // 2. Delete the offensive message
         await gss.sendMessage(m.from, { delete: m.key });
 
-        // Warning system
+        // 3. Update warning count
         const warnedUsers = warnedUsersDB.get(m.from) || new Map();
         const userData = warnedUsers.get(m.sender) || { count: 0, lastWarning: 0 };
         
-        // Reset if >24 hours since last warning
+        // Reset if last warning was >24 hours ago
         if (Date.now() - userData.lastWarning > 86400000) {
           userData.count = 0;
         }
@@ -119,25 +183,25 @@ const antiword = async (m, gss) => {
         warnedUsers.set(m.sender, userData);
         warnedUsersDB.set(m.from, warnedUsers);
 
-        // Remove after 3 warnings
+        // 4. Remove user after 3 warnings
         if (userData.count >= 3) {
           try {
-            const botAdmin = groupMetadata.participants.find(p => p.id === gss.user.id)?.admin;
-            if (!botAdmin) return m.reply("*I need admin rights to remove members*");
-
             await gss.groupParticipantsUpdate(m.from, [m.sender], 'remove');
             
+            // Notify group
             await gss.sendMessage(
               m.from, 
               {
-                text: `🚫 @${m.sender.split('@')[0]} removed for:\n> ${foundWords.slice(0, 3).join(', ')}${foundWords.length > 3 ? '...' : ''}\n> Warnings: 3/3`,
+                text: `🚫 @${m.sender.split('@')[0]} was removed for:\n> ${foundWords.slice(0, 3).join(', ')}${foundWords.length > 3 ? '...' : ''}\n> Warnings: 3/3`,
                 mentions: [m.sender]
               }
             );
             
+            // Reset warnings
             warnedUsers.delete(m.sender);
-          } catch (e) {
-            console.error("Removal failed:", e);
+          } catch (removeError) {
+            console.error("Removal failed:", removeError);
+            return m.reply("*Failed to remove violator!*");
           }
         } else {
           // Send warning
@@ -153,6 +217,7 @@ const antiword = async (m, gss) => {
     }
   } catch (error) {
     console.error("Antiword Error:", error);
+    m.reply("*⚠️ Error processing antiword*");
   }
 };
 
