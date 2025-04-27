@@ -1,6 +1,8 @@
+// antisticker.js
 import config from "../config.cjs";
 
-const antistickerDB = new Map(); // Temporary in-memory storage
+const antistickerDB = new Map(); // { groupJid: boolean }
+const warnedUsersDB = new Map(); // { groupJid: Map<userJid, {count: number, lastWarning: Date}> }
 
 const antisticker = async (m, gss) => {
   try {
@@ -11,14 +13,14 @@ const antisticker = async (m, gss) => {
       if (!m.isGroup) return m.reply("*Command reserved for groups only*\n\n> *Try it in a group*");
 
       const groupMetadata = await gss.groupMetadata(m.from);
-      const participants = groupMetadata.participants;
-      const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
+      const senderAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin;
 
-      if (!senderAdmin) {
+      if (!senderAdmin && m.sender !== config.OWNER_NUMBER + '@s.whatsapp.net') {
         return m.reply("*Command for admins only*\n\n> *Request admin role*");
       }
 
       antistickerDB.set(m.from, true);
+      warnedUsersDB.set(m.from, new Map());
       return m.reply("*Antisticker is now activated for this group.*\n\n> *Stickers will be auto-deleted*");
     }
 
@@ -27,53 +29,82 @@ const antisticker = async (m, gss) => {
       if (!m.isGroup) return m.reply("*Command only for groups!*\n\n> *Please try it in a group*");
 
       const groupMetadata = await gss.groupMetadata(m.from);
-      const participants = groupMetadata.participants;
-      const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
+      const senderAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin;
 
-      if (!senderAdmin) {
-        return m.reply("*Only admins can disable antisticker!*\n\n> *Smile in pain*");
+      if (!senderAdmin && m.sender !== config.OWNER_NUMBER + '@s.whatsapp.net') {
+        return m.reply("*Only admins can disable antisticker!*\n\n> *Contact group admin*");
       }
 
       antistickerDB.delete(m.from);
+      warnedUsersDB.delete(m.from);
       return m.reply("*Antisticker is now disabled for this group.*\n\n> *Stickers are now allowed*");
     }
 
-    // Auto-detect and delete stickers
-    if (antistickerDB.get(m.from)) {
-      if (m.mtype === 'stickerMessage') {
-        // Get group metadata
-        const groupMetadata = await gss.groupMetadata(m.from);
-        const participants = groupMetadata.participants;
+    // Sticker detection and deletion
+    if (antistickerDB.get(m.from) && m.mtype === 'stickerMessage') {
+      const groupMetadata = await gss.groupMetadata(m.from);
+      const senderAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin;
 
-        // Check if the sender is an admin
-        const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
+      // Skip if admin or bot owner
+      if (senderAdmin || m.sender === config.OWNER_NUMBER + '@s.whatsapp.net') return;
 
-        if (senderAdmin) {
-          // If the sender is an admin, do not take any action
-          return;
-        }
+      // 1. Delete the sticker immediately
+      await gss.sendMessage(m.from, { delete: m.key });
 
-        // Delete the sticker
-        await gss.sendMessage(m.from, { delete: m.key });
+      // 2. Warning system
+      const warnedUsers = warnedUsersDB.get(m.from) || new Map();
+      const userData = warnedUsers.get(m.sender) || { count: 0, lastWarning: 0 };
 
-        // Warn the user
-        await m.reply(`*Stickers are not allowed in this group!*\n\n> *This is your first warning.*`);
+      // Reset if last warning was >24 hours ago
+      if (Date.now() - userData.lastWarning > 86400000) {
+        userData.count = 0;
+      }
 
-        // Track warned users
-        const warnedUsers = antistickerDB.get(m.from + "_warned") || new Set();
-        if (warnedUsers.has(m.sender)) {
-          // Remove the user if they repeat the violation
+      userData.count++;
+      userData.lastWarning = Date.now();
+      warnedUsers.set(m.sender, userData);
+      warnedUsersDB.set(m.from, warnedUsers);
+
+      // 3. Remove user after 3 violations
+      if (userData.count >= 3) {
+        try {
+          // Verify bot is admin before removing
+          const botAdmin = groupMetadata.participants.find(p => p.id === gss.user.id)?.admin;
+          if (!botAdmin) {
+            return m.reply("*I need admin rights to remove members!*");
+          }
+
           await gss.groupParticipantsUpdate(m.from, [m.sender], 'remove');
-          return m.reply(`*${m.sender.split('@')[0]} has been removed for sending stickers.*`);
-        } else {
-          warnedUsers.add(m.sender);
-          antistickerDB.set(m.from + "_warned", warnedUsers);
+          
+          // Notify group
+          await gss.sendMessage(
+            m.from, 
+            {
+              text: `🚫 @${m.sender.split('@')[0]} was removed for sending stickers\n> Violations: 3/3`,
+              mentions: [m.sender]
+            }
+          );
+          
+          // Reset warnings
+          warnedUsers.delete(m.sender);
+        } catch (removeError) {
+          console.error("Removal failed:", removeError);
+          return m.reply("*Failed to remove sticker violator!*");
         }
+      } else {
+        // Send warning
+        await gss.sendMessage(
+          m.from,
+          {
+            text: `⚠️ @${m.sender.split('@')[0]} - Stickers not allowed!\n> Warnings: ${userData.count}/3`,
+            mentions: [m.sender]
+          }
+        );
       }
     }
   } catch (error) {
-    console.error("Error in Antisticker:", error);
-    m.reply("*⚠️ An error occurred while processing Antisticker.*\n\n> *Please try again later*");
+    console.error("Antisticker Error:", error);
+    m.reply("*⚠️ An error occurred while processing antisticker*");
   }
 };
 
