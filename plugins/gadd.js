@@ -18,7 +18,7 @@ const newsletterContext = {
 };
 
 cmd({
-    pattern: "get",
+    pattern: "cmd",
     alias: ["source", "js"],
     desc: "Fetch the full source code of a command",
     category: "owner",
