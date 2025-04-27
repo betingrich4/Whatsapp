@@ -16,6 +16,7 @@ const config = {
   TIME_ZONE: process.env.TIME_ZONE || "Africa/Nairobi", // Timezone for timestamps
 
   /* [OWNER CONFIGURATION] */
+  ANTI_BAD_WORD: process.env.ANTI_BAD_WORD === "true" || true,
   OWNER_NUMBER: process.env.OWNER_NUMBER || "218942841878",
   SUDO_NUMBER: process.env.SUDO_NUMBER || "254740007567",
   CHANNEL_JID: process.env.CHANNEL_JID || "120363299029326322@newsletter",
