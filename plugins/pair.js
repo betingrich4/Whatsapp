@@ -1,101 +1,70 @@
-import axios from "axios";
-import pkg from "@whiskeysockets/baileys";
-const { generateWAMessageFromContent, proto } = pkg;
+import fetch from 'node-fetch';
+import config from '../config.cjs';
 
-const PairCode = async (m, Matrix) => {
-  const prefix = ".";
-  const cmd = m.body.startsWith(prefix)
-    ? m.body.slice(prefix.length).split(" ")[0].toLowerCase()
-    : "";
-  const text = m.body.slice(prefix.length + cmd.length).trim();
-
-  const validCommands = ["pair", "session", "paircode", "qrcode"];
-
-  if (validCommands.includes(cmd)) {
-    if (!text) return m.reply(`Example Usage: .code 25575259xxxx.`);
-
+const pairDevice = async (m, gss) => {
     try {
-      await m.React("🚲");
-      await m.reply("Waitgenerating your pair code....");
+        const prefix = config.PREFIX;
+        const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+        const args = m.body.slice(prefix.length + cmd.length).trim();
 
-      const encodedNumber = encodeURIComponent(text);
-      const apiUrl = `https://botto2-608d38531298.herokuapp.com/code?number=${encodedNumber}`;
-      const response = await axios.get(apiUrl);
-      const result = response.data;
+        // Newsletter configuration
+        const newsletterContext = {
+            forwardingScore: 999,
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: config.CHANNEL_JID || '120363299029326322@newsletter',
+                newsletterName: config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
+                serverMessageId: 143
+            }
+        };
 
-      if (result && result.code) {
-        const pairCode = result.code;
+        // Check if command matches
+        if (cmd !== 'pair' && cmd !== 'getpair' && cmd !== 'clonebot') return;
 
-        let buttons = [
-          {
-            name: "cta_copy",
-            buttonParamsJson: JSON.stringify({
-              display_text: "📋 Copy Pair Code",
-              id: "copy_code",
-              copy_code: pairCode,
-            }),
-          },
-          {
-            name: "cta_url",
-            buttonParamsJson: JSON.stringify({
-              display_text: "follow",
-              url: `https://whatsapp.com/channel/0029VaWJMi3GehEE9e1YsI1S`,
-            }),
-          },
-          {
-            name: "quick_reply",
-            buttonParamsJson: JSON.stringify({
-              display_text: "Main Menu",
-              id: ".menu",
-            }),
-          },
-        ];
+        // Validate arguments
+        if (!args) {
+            return m.reply(`*Usage Example:* ${prefix}pair +25474000XX\n\n*Use this code to link your WhatsApp via Linked Devices*`);
+        }
 
-        let msg = generateWAMessageFromContent(
-          m.from,
-          {
-            viewOnceMessage: {
-              message: {
-                messageContextInfo: {
-                  deviceListMetadata: {},
-                  deviceListMetadataVersion: 2,
-                },
-                interactiveMessage: proto.Message.InteractiveMessage.create({
-                  body: proto.Message.InteractiveMessage.Body.create({
-                    text: `Here is your pair code:\n\n*${pairCode}*\n\nCopy and paste it to the notification above or link devices.`,
-                  }),
-                  footer: proto.Message.InteractiveMessage.Footer.create({
-                    text: "> *Made by 3 Men Army*",
-                  }),
-                  header: proto.Message.InteractiveMessage.Header.create({
-                    title: "",
-                    subtitle: "",
-                    hasMediaAttachment: false,
-                  }),
-                  nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.create({
-                    buttons: buttons,
-                  }),
-                }),
-              },
-            },
-          },
-          {}
-        );
+        // Validate phone number format
+        if (!args.match(/^\+?[0-9]{10,15}$/)) {
+            return m.reply("❌ Invalid phone number format. Please include country code.\nExample: +9234275822XX");
+        }
 
-        await Matrix.relayMessage(msg.key.remoteJid, msg.message, {
-          messageId: msg.key.id,
-        });
+        const response = await fetch(`https://sessio-6645ccddfbba.herokuapp.com/pair?phone=${encodeURIComponent(args)}`);
+        const pair = await response.json();
 
-        await m.React("✅");
-      } else {
-        throw new Error("Invalid response from API.");
-      }
+        if (!pair?.code) {
+            return m.reply("❌ Failed to generate pairing code. Please check:\n1. Phone number format\n2. API service status\n3. Try again later");
+        }
+
+        const pairingCode = pair.code;
+        const formattedMessage = `⬤─── *𝖒𝖆𝖗𝖎𝖘𝖊𝖑* ───⬤
+
+📱 *Phone Number:* ${args}
+🔢 *Pairing Code:* ${pairingCode}
+
+╰──────────⊷  
+⚡ *How to use:*
+1. Open WhatsApp > Settings
+2. Tap "Linked Devices"
+3. Select "Link a Device"
+4. Enter this code when prompted
+
+📌 *Note:* Code expires in 20 seconds`;
+
+        await m.reply(formattedMessage);
+        
+        // Send raw code separately for easy copy
+        await gss.sendMessage(m.from, { 
+            text: pairingCode,
+            contextInfo: newsletterContext
+        }, { quoted: m });
+
     } catch (error) {
-      console.error("Error getting pair code:", error.message);
-      m.reply("Error getting pair code.");
-      await m.React("❌");
+        console.error('Pairing Error:', error);
+        await m.reply(`❌ Error: ${error.message}\nPlease try again or contact support.`);
     }
-  }
 };
 
-export default PairCode;
+export default pairDevice;
