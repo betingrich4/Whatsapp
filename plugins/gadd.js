@@ -72,3 +72,4 @@ ${config.CHANNEL_NAME || '𝖒𝖆𝖗𝖎𝖘𝖊𝖑'}* 💜`;
 });
 
 export default cmd;
+
