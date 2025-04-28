@@ -40,7 +40,7 @@ const config = {
   AUTO_READ: process.env.AUTO_READ === "true" || false,
   AUTO_TYPING: process.env.AUTO_TYPING === "true" || false,
   AUTO_RECORDING: process.env.AUTO_RECORDING === "true" || false,
-  AUTO_STICKER: process.env.AUTO_STICKER === "true" || false,
+  ANTI_STICKER: process.env.ANTI_STICKER === "true" || true,
   AUTO_DL: process.env.AUTO_DL === "true" || false,
   
   /* [REACTION SETTINGS] */
