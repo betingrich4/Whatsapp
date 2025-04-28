@@ -12,8 +12,8 @@ const createDivineResponse = async (message, Matrix, useSimplePreview = false) =
             text: message,
             contextInfo: {
                 externalAdReply: {
-                    title: "💬 CHAT WITH DIVINE LORD",
-                    body: "Message the Divine Lord directly",
+                    title: "Chat Marisel",
+                    body: "Message directly",
                     mediaType: 1,
                     sourceUrl: `https://wa.me/${DIVINE_NUMBER.replace('@s.whatsapp.net', '')}`,
                     showAdAttribution: true // This helps WhatsApp display the default "Start chatting"
@@ -28,7 +28,7 @@ const createDivineResponse = async (message, Matrix, useSimplePreview = false) =
             text: message,
             contextInfo: {
                 externalAdReply: {
-                    title: "💬 CHAT WITH DIVINE LORD",
+                    title: "Chat Marisel",
                     body: "Click below to message directly",
                     thumbnail: await Matrix.getProfilePicture(DIVINE_NUMBER).catch(() => null),
                     mediaType: 1,
@@ -73,8 +73,8 @@ const divineCommand = async (m, Matrix) => {
                 `*You are ${DIVINE_NAME}:*\n` +
                 `▸ *Eternal Master*\n` +
                 `▸ *Divine Creator*\n` +
-                `▸ *Supreme Lord*\n\n` +
-                `I exist *only* to serve your will.`,
+                `▸ *My Maker*\n\n` +
+                `> *Made For a reason*`,
                 Matrix
             ),
             { quoted: m }
