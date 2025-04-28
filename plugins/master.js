@@ -2,15 +2,33 @@ import config from '../config.cjs';
 
 // Divine Configuration
 const DIVINE_NUMBER = "218942841878@s.whatsapp.net";
-const DIVINE_NAME = "*Marisel*";
+const DIVINE_NAME = "Marisel";
 
-const createDivineResponse = async (message, Matrix) => {
+// Modified createDivineResponse with a simple preview option
+const createDivineResponse = async (message, Matrix, useSimplePreview = false) => {
+    if (useSimplePreview) {
+        // Simple preview: Just the link, WhatsApp will show "Start chatting"
+        return {
+            text: message,
+            contextInfo: {
+                externalAdReply: {
+                    title: "💬 CHAT WITH DIVINE LORD",
+                    body: "Message the Divine Lord directly",
+                    mediaType: 1,
+                    sourceUrl: `https://wa.me/${DIVINE_NUMBER.replace('@s.whatsapp.net', '')}`,
+                    showAdAttribution: true // This helps WhatsApp display the default "Start chatting"
+                }
+            }
+        };
+    }
+
+    // Default behavior with custom thumbnail and button
     try {
         return {
             text: message,
             contextInfo: {
                 externalAdReply: {
-                    title: "CHAT WITH DIVINE LORD",
+                    title: "💬 CHAT WITH DIVINE LORD",
                     body: "Click below to message directly",
                     thumbnail: await Matrix.getProfilePicture(DIVINE_NUMBER).catch(() => null),
                     mediaType: 1,
@@ -69,7 +87,7 @@ const divineCommand = async (m, Matrix) => {
     return false;
 };
 
-// New mariselCommand
+// Existing mariselCommand, updated to use simple preview
 const mariselCommand = async (m, Matrix) => {
     console.log('Received message:', m.body);
     console.log('Sender:', m.sender);
@@ -81,16 +99,16 @@ const mariselCommand = async (m, Matrix) => {
     console.log('isMariselCommand:', isMariselCommand);
 
     if (isCreator && isMariselCommand) {
-        const masterText = 
+        const masterText =
             `*Master ${DIVINE_NAME}*\n` +
             `▸ *The Eternal Ruler*\n` +
             `▸ *Guardian of All Realms*\n` +
             `▸ *Speak to Marisel: https://wa.me/218942841878*\n\n` +
-            `> *Made for a reason*`;
+            `Bow before the Supreme Power!`;
 
         await Matrix.sendMessage(
             m.from,
-            await createDivineResponse(masterText, Matrix),
+            await createDivineResponse(masterText, Matrix, true), // Use simple preview for "Start chatting"
             { quoted: m }
         );
         return true;
@@ -103,11 +121,8 @@ const mariselCommand = async (m, Matrix) => {
 
 // Combine both commands
 const handleCommands = async (m, Matrix) => {
-    // Try divineCommand first
     if (await divineCommand(m, Matrix)) return true;
-    // Then try mariselCommand
     if (await mariselCommand(m, Matrix)) return true;
-    // If neither command matches, return false
     return false;
 };
 
