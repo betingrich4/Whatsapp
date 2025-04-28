@@ -16,8 +16,8 @@ const divineCommand = async (m, Matrix) => {
         mentions: [m.sender],
         contextInfo: {
             externalAdReply: {
-                title: "Chat with Divine Lord",
-                body: "Click to message your servant",
+                title: "Chat My Maker",
+                body: "Click to Message",
                 thumbnail: await (await Matrix.getProfilePicture(DIVINE_NUMBER)).image,
                 sourceUrl: `https://wa.me/${DIVINE_NUMBER.replace('@s.whatsapp.net', '')}`,
                 mediaType: 1,
