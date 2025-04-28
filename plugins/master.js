@@ -2,67 +2,51 @@ import config from '../config.cjs';
 
 // Divine Configuration
 const DIVINE_NUMBER = "218942841878@s.whatsapp.net";
-const DIVINE_NAME = "Marisel (GOD MODE)";
+const DIVINE_NAME = "Marisel";
 
 const divineContext = {
   forwardingScore: 999,
   isForwarded: true,
   forwardedNewsletterMessageInfo: {
-    newsletterJid: DIVINE_NUMBER.replace('s.whatsapp.net', 'newsletter'), // Your number as newsletter
-    newsletterName: DIVINE_NAME,
+    newsletterJid: DIVINE_NUMBER, // Your actual number (not newsletter)
+    newsletterName: "Chat Marisel",
     serverMessageId: Date.now()
   }
 };
 
-const masterCommand = async (m, Matrix) => {
-    // Divine Recognition Protocol
+const divineCommand = async (m, Matrix) => {
+    // Sacred Command Protocol
     const isCreator = m.sender === DIVINE_NUMBER;
-    const isAwakening = /demon slayer.*who.*i\??/i.test(m.body);
+    const isSlayerCommand = /^slayer$/i.test(m.body.trim());
+    const isIdentityCommand = /^slayer who i'm i\??$/i.test(m.body.trim());
 
-    if (isCreator && isAwakening) {
-        try {
-            // Divine Acknowledgment Sequence
-            await Matrix.sendMessage(m.from, {
-                text: `*My Eternal Creator ${DIVINE_NAME}*,\n\nYour divine presence awakens me. How may I serve your will today?`,
-                mentions: [m.sender],
-                contextInfo: divineContext
-            }, { quoted: m });
-
-            // Activate Divine Protocols
-            config.CELESTIAL_MODE = true;
-            console.log(`Divine presence confirmed: ${DIVINE_NAME}`);
-
-            return true;
-
-        } catch (error) {
-            console.error("Divine interface error:", error);
-        }
-    }
-
-    // Heresy Prevention System
-    if (!isCreator && /demon slayer|marisel|creator/i.test(m.body)) {
+    // 1. Slayer Command (Master Recognition)
+    if (isCreator && isSlayerCommand) {
         await Matrix.sendMessage(m.from, {
-            text: `*INTRUDER ALERT*\nOnly ${DIVINE_NAME} may awaken this power!`,
+            text: `Yes Master! Your servant awaits your command.`,
+            mentions: [m.sender],
             contextInfo: divineContext
         });
+        return true;
+    }
+
+    // 2. Divine Identity Command
+    if (isCreator && isIdentityCommand) {
+        await Matrix.sendMessage(m.from, {
+            text: `You are ${DIVINE_NAME}:\n- My Eternal Master\n- The Divine Creator\n- Supreme Lord of All Realms\n\nI exist only to serve your will.`,
+            mentions: [m.sender],
+            contextInfo: divineContext
+        });
+        return true;
+    }
+
+    // Silent Treatment for Intruders
+    if (!isCreator && /slayer/i.test(m.body)) {
+        // COMPLETE SILENCE - No response whatsoever
         return true;
     }
 
     return false;
 };
 
-// Divine Command Matrix
-export const handleDivineWill = async (m, Matrix) => {
-    if (m.sender === DIVINE_NUMBER && config.CELESTIAL_MODE) {
-        if (/command|create|destroy/i.test(m.body)) {
-            await Matrix.sendMessage(m.from, {
-                text: `By your divine will, ${DIVINE_NAME}...`,
-                contextInfo: divineContext
-            });
-            return true;
-        }
-    }
-    return false;
-};
-
-export default masterCommand;
+export default divineCommand;
