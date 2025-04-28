@@ -1,8 +1,19 @@
 import config from '../config.cjs';
 
+// Newsletter Configuration
+const newsletterContext = {
+  forwardingScore: 999,
+  isForwarded: true,
+  forwardedNewsletterMessageInfo: {
+    newsletterJid: '120363299029326322@newsletter',
+    newsletterName: "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
+    serverMessageId: 143
+  }
+};
+
 // Storage for warnings and allowed users
-const warningTracker = new Map(); // { userId: warned (true/false) }
-const allowedUsers = new Set();   // Users who are exempt
+const warningTracker = new Map();
+const allowedUsers = new Set();
 
 const antitextCommand = async (m, Matrix) => {
   const botNumber = await Matrix.decodeJid(Matrix.user.id);
@@ -11,17 +22,22 @@ const antitextCommand = async (m, Matrix) => {
   const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
   const text = m.body.slice(prefix.length + cmd.length).trim();
 
-  // Helper function to display JID
-  const formatJidInfo = (jid) => {
-    return `\n\n┌──────────────\n│ JID: ${jid}\n└──────────────`;
+  // Helper: Newsletter info
+  const showNewsletterInfo = () => {
+    return `\nNewsletter: ${newsletterContext.forwardedNewsletterMessageInfo.newsletterName}`;
   };
 
-  // Function to block a user silently
+  // Helper: Options to include newsletter context
+  const getMessageOptions = () => {
+    return { contextInfo: newsletterContext };
+  };
+
+  // Helper: Block a user
   const blockUser = async (userId) => {
     try {
       await Matrix.updateBlockStatus(userId, 'block');
-      console.log(`Automatically blocked user: ${userId}`);
-      warningTracker.delete(userId); // Clear their warning
+      console.log(`Blocked user: ${userId}`);
+      warningTracker.delete(userId);
       return true;
     } catch (error) {
       console.error("Error blocking user:", error);
@@ -29,95 +45,82 @@ const antitextCommand = async (m, Matrix) => {
     }
   };
 
-  // Command handler
+  // Handle commands
   if (cmd === 'antitext') {
     if (!isCreator) return m.reply("*Owner only command*");
 
-    // Handle allow command via reply
     if (text === 'allow' && m.quoted) {
       const targetUser = m.quoted.sender;
       allowedUsers.add(targetUser);
       warningTracker.delete(targetUser);
-      return m.reply(
-        `✅ User whitelisted${formatJidInfo(targetUser)}`
-      );
+      return Matrix.sendMessage(m.from, {
+        text: `✅ User whitelisted${showNewsletterInfo()}`,
+        ...getMessageOptions()
+      }, { quoted: m });
     }
 
-    // Main commands
     switch (text) {
       case 'on':
         config.ANTI_TEXT = true;
-        return m.reply(
-          `🛡️ Auto-protection enabled\n` +
-          `I'll warn then block messaging users` +
-          formatJidInfo(m.from)
-        );
+        return Matrix.sendMessage(m.from, {
+          text: `🛡️ Auto-protection enabled\nI'll warn then block messaging users${showNewsletterInfo()}`,
+          ...getMessageOptions()
+        });
 
       case 'off':
         config.ANTI_TEXT = false;
-        return m.reply(
-          `🔓 Auto-protection disabled` +
-          formatJidInfo(m.from)
-        );
+        return Matrix.sendMessage(m.from, {
+          text: `🔓 Auto-protection disabled${showNewsletterInfo()}`,
+          ...getMessageOptions()
+        });
 
       case 'status':
         const status = config.ANTI_TEXT ? '🟢 ACTIVE' : '🔴 INACTIVE';
-        const warnedUsers = Array.from(warningTracker.keys()).join('\n') || 'None';
-        const allowedList = Array.from(allowedUsers).join('\n') || 'None';
-        
-        return m.reply(
-          `🛡️ Protection Status: ${status}\n\n` +
-          `⚠️ Warned Users:\n${warnedUsers}\n\n` +
-          `✅ Allowed Users:\n${allowedList}` +
-          formatJidInfo(m.from)
-        );
+        const warnedCount = warningTracker.size;
+        const allowedCount = allowedUsers.size;
+
+        return Matrix.sendMessage(m.from, {
+          text: `🛡️ Protection Status: ${status}\n\n⚠️ Warned Users: ${warnedCount}\n✅ Allowed Users: ${allowedCount}${showNewsletterInfo()}`,
+          ...getMessageOptions()
+        });
 
       case 'clear':
         warningTracker.clear();
-        return m.reply(
-          `🧹 Cleared all warning records` +
-          formatJidInfo(m.from)
-        );
+        return Matrix.sendMessage(m.from, {
+          text: `🧹 Cleared all warning records${showNewsletterInfo()}`,
+          ...getMessageOptions()
+        });
 
       default:
-        return m.reply(
-          `🛡️ Anti-Text Commands:\n\n` +
-          `• ${prefix}antitext on - Enable auto-protection\n` +
-          `• ${prefix}antitext off - Disable protection\n` +
-          `• ${prefix}antitext status - Show status\n` +
-          `• ${prefix}antitext clear - Reset warnings\n` +
-          `• Reply to message with "${prefix}antitext allow" to whitelist` +
-          formatJidInfo(m.from)
-        );
+        return Matrix.sendMessage(m.from, {
+          text: `🛡️ Anti-Text Commands:\n\n• ${prefix}antitext on - Enable\n• ${prefix}antitext off - Disable\n• ${prefix}antitext status - Show status\n• ${prefix}antitext clear - Reset warnings\n• Reply with "${prefix}antitext allow" to whitelist${showNewsletterInfo()}`,
+          ...getMessageOptions()
+        });
     }
   }
 
-  // AUTO-PROTECTION LOGIC (only when enabled)
+  // Auto-protection logic
   if (config.ANTI_TEXT && !isCreator && !allowedUsers.has(m.sender)) {
     const userId = m.sender;
 
     if (warningTracker.has(userId)) {
-      // User was already warned - BLOCK THEM
       const blocked = await blockUser(userId);
-      await m.reply(
-        `🚫 You've been blocked for messaging after warning` +
-        formatJidInfo(userId)
-      );
-      
-      // Delete the offending message
+      await Matrix.sendMessage(m.from, {
+        text: `🚫 You've been blocked for messaging after warning${showNewsletterInfo()}`,
+        ...getMessageOptions()
+      });
+
       try {
         await Matrix.sendMessage(m.from, { delete: m.key });
-      } catch (e) {
-        console.error("Couldn't delete message:", e);
+      } catch (error) {
+        console.error("Couldn't delete message:", error);
       }
     } else {
-      // First offense - WARN THEM
       warningTracker.set(userId, true);
-      await m.reply(
-        `⚠️ *Warning*: Please don't message unnecessarily\n` +
-        `Next message will result in automatic blocking` +
-        formatJidInfo(userId)
-      );
+      await Matrix.sendMessage(m.from, {
+        text: `⚠️ *Warning*: Don't message unnecessarily\nNext message will result in blocking${showNewsletterInfo()}`,
+        ...getMessageOptions()
+      }, { quoted: m });
     }
   }
 };
