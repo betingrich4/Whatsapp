@@ -1,6 +1,6 @@
 import config from '../config.cjs';
 
-// Newsletter Configuration
+// Newsletter Configuration (internal use only, not shown to users)
 const newsletterContext = {
   forwardingScore: 999,
   isForwarded: true,
@@ -22,106 +22,80 @@ const antitextCommand = async (m, Matrix) => {
   const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
   const text = m.body.slice(prefix.length + cmd.length).trim();
 
-  // Helper: Newsletter info
-  const showNewsletterInfo = () => {
-    return `\nNewsletter: ${newsletterContext.forwardedNewsletterMessageInfo.newsletterName}`;
-  };
+  // Function to create quoted message options
+  const getMessageOptions = () => ({
+    contextInfo: {
+      forwardingScore: newsletterContext.forwardingScore,
+      isForwarded: newsletterContext.isForwarded,
+      forwardedNewsletterMessageInfo: newsletterContext.forwardedNewsletterMessageInfo
+    }
+  });
 
-  // Helper: Options to include newsletter context
-  const getMessageOptions = () => {
-    return { contextInfo: newsletterContext };
-  };
-
-  // Helper: Block a user
-  const blockUser = async (userId) => {
+  // Function to block the user (you can expand this according to your bot's needs)
+  const blockUser = async (jid) => {
     try {
-      await Matrix.updateBlockStatus(userId, 'block');
-      console.log(`Blocked user: ${userId}`);
-      warningTracker.delete(userId);
-      return true;
+      await Matrix.updateBlockStatus(jid, 'block');
     } catch (error) {
-      console.error("Error blocking user:", error);
-      return false;
+      console.error('Error blocking user:', error);
     }
   };
 
-  // Handle commands
-  if (cmd === 'antitext') {
-    if (!isCreator) return m.reply("*Owner only command*");
-
-    if (text === 'allow' && m.quoted) {
-      const targetUser = m.quoted.sender;
-      allowedUsers.add(targetUser);
-      warningTracker.delete(targetUser);
-      return Matrix.sendMessage(m.from, {
-        text: `✅ User whitelisted${showNewsletterInfo()}`,
-        ...getMessageOptions()
-      }, { quoted: m });
-    }
-
-    switch (text) {
-      case 'on':
-        config.ANTI_TEXT = true;
-        return Matrix.sendMessage(m.from, {
-          text: `🛡️ Auto-protection enabled\nI'll warn then block messaging users${showNewsletterInfo()}`,
-          ...getMessageOptions()
-        });
-
-      case 'off':
-        config.ANTI_TEXT = false;
-        return Matrix.sendMessage(m.from, {
-          text: `🔓 Auto-protection disabled${showNewsletterInfo()}`,
-          ...getMessageOptions()
-        });
-
-      case 'status':
-        const status = config.ANTI_TEXT ? '🟢 ACTIVE' : '🔴 INACTIVE';
-        const warnedCount = warningTracker.size;
-        const allowedCount = allowedUsers.size;
-
-        return Matrix.sendMessage(m.from, {
-          text: `🛡️ Protection Status: ${status}\n\n⚠️ Warned Users: ${warnedCount}\n✅ Allowed Users: ${allowedCount}${showNewsletterInfo()}`,
-          ...getMessageOptions()
-        });
-
-      case 'clear':
-        warningTracker.clear();
-        return Matrix.sendMessage(m.from, {
-          text: `🧹 Cleared all warning records${showNewsletterInfo()}`,
-          ...getMessageOptions()
-        });
-
-      default:
-        return Matrix.sendMessage(m.from, {
-          text: `🛡️ Anti-Text Commands:\n\n• ${prefix}antitext on - Enable\n• ${prefix}antitext off - Disable\n• ${prefix}antitext status - Show status\n• ${prefix}antitext clear - Reset warnings\n• Reply with "${prefix}antitext allow" to whitelist${showNewsletterInfo()}`,
-          ...getMessageOptions()
-        });
-    }
+  // --- Commands Handler ---
+  if (cmd === 'antitext' && text === 'on') {
+    warningTracker.clear();
+    return Matrix.sendMessage(m.from, {
+      text: `🛡️ Anti-text protection enabled.`,
+      ...getMessageOptions()
+    });
   }
 
-  // Auto-protection logic
-  if (config.ANTI_TEXT && !isCreator && !allowedUsers.has(m.sender)) {
-    const userId = m.sender;
+  if (cmd === 'antitext' && text === 'off') {
+    warningTracker.clear();
+    return Matrix.sendMessage(m.from, {
+      text: `🛡️ Anti-text protection disabled.`,
+      ...getMessageOptions()
+    });
+  }
 
-    if (warningTracker.has(userId)) {
-      const blocked = await blockUser(userId);
-      await Matrix.sendMessage(m.from, {
-        text: `🚫 You've been blocked for messaging after warning${showNewsletterInfo()}`,
-        ...getMessageOptions()
-      });
+  if (cmd === 'antitext' && text === 'allow') {
+    allowedUsers.add(m.sender);
+    return Matrix.sendMessage(m.from, {
+      text: `✅ User whitelisted.`,
+      ...getMessageOptions()
+    });
+  }
 
-      try {
-        await Matrix.sendMessage(m.from, { delete: m.key });
-      } catch (error) {
-        console.error("Couldn't delete message:", error);
-      }
-    } else {
-      warningTracker.set(userId, true);
-      await Matrix.sendMessage(m.from, {
-        text: `⚠️ *Warning*: Don't message unnecessarily\nNext message will result in blocking${showNewsletterInfo()}`,
-        ...getMessageOptions()
-      }, { quoted: m });
-    }
+  if (cmd === 'antitext' && text === 'disallow') {
+    allowedUsers.delete(m.sender);
+    return Matrix.sendMessage(m.from, {
+      text: `⛔ User removed from whitelist.`,
+      ...getMessageOptions()
+    });
+  }
+
+  // --- Normal Message Processing ---
+  // Ignore commands themselves
+  if (m.body.startsWith(prefix)) return;
+
+  // Check if user is whitelisted
+  if (allowedUsers.has(m.sender)) return;
+
+  // Warn users for normal text messages
+  const warnings = warningTracker.get(m.sender) || 0;
+
+  if (warnings === 0) {
+    warningTracker.set(m.sender, 1);
+    return Matrix.sendMessage(m.from, {
+      text: `⚠️ Warning: Don't message unnecessarily.\nNext message will result in blocking.`,
+      ...getMessageOptions()
+    });
+  } else {
+    await Matrix.sendMessage(m.from, {
+      text: `⛔ You have been blocked for spamming.`,
+      ...getMessageOptions()
+    });
+    await blockUser(m.sender);
+    warningTracker.delete(m.sender);
   }
 };
 
