@@ -38,45 +38,31 @@ const antistickerCommand = async (m, Matrix) => {
   // Sticker detection and deletion
   if (config.ANTI_STICKER && m.message?.stickerMessage) {
     try {
-      // Check if in group
-      if (m.isGroup) {
-        // Delete only for me in groups
-        await Matrix.sendMessage(m.from, { 
-          delete: {
-            id: m.key.id,
-            participant: m.sender,
-            remoteJid: m.from,
-            fromMe: false
-          }
-        });
-      } 
-      // Check if in private chat and I'm admin
-      else {
-        // Try to delete for everyone first
-        try {
-          await Matrix.sendMessage(m.from, { 
-            delete: m.key 
-          });
-        } catch (error) {
-          // If delete for everyone fails (not admin), delete just for me
-          await Matrix.sendMessage(m.from, { 
-            delete: {
-              id: m.key.id,
-              participant: m.sender,
-              remoteJid: m.from,
-              fromMe: false
-            }
-          });
+      // Delete the sticker message
+      await Matrix.sendMessage(m.from, {
+        delete: {
+          id: m.key.id,
+          participant: m.sender,
+          remoteJid: m.from,
+          fromMe: false
         }
-        
-        // Send warning in private chats
+      });
+
+      // Send warning (only in private chats)
+      if (!m.isGroup) {
         await Matrix.sendMessage(m.from, { 
           text: `⚠️ Stickers are not allowed here`,
           mentions: [m.sender] 
         });
       }
     } catch (error) {
-      console.error("Error deleting sticker:", error);
+      console.error("Error handling sticker:", error);
+      // Fallback: Try alternative deletion method if first fails
+      try {
+        await Matrix.sendMessage(m.from, { delete: m.key });
+      } catch (fallbackError) {
+        console.error("Fallback deletion failed:", fallbackError);
+      }
     }
   }
 };
