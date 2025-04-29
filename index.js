@@ -21,6 +21,7 @@ import moment from 'moment-timezone';
 import axios from 'axios';
 import config from './config.cjs';
 import pkg from './lib/autoreact.cjs';
+import { initAutoBio } from './plugins/autobio.js'; // Added import for initAutoBio
 
 const { emojis, doReact } = pkg;
 const prefix = process.env.PREFIX || config.PREFIX;
@@ -186,6 +187,9 @@ async function start() {
             }
         });
 
+        // Initialize autobio updates
+        initAutoBio(Matrix); // Added call to initAutoBio
+
         Matrix.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect } = update;
             if (connection === 'close') {
@@ -318,4 +322,3 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(chalk.green(`🌐 Server is running on port ${PORT}`));
 });
-                        
