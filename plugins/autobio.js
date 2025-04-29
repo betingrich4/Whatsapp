@@ -1,65 +1,38 @@
+import moment from 'moment-timezone';
 import config from '../config.cjs';
-import { format } from 'date-fns';
+import chalk from 'chalk';
 
-const AUTO_BIO_ENABLED = true; // Set to false to disable
 const MASTER_NAME = "Marisel";
-const TIMEZONE = "Africa/Nairobi"; // Libya timezone (GMT+2)
+const TIMEZONE = config.TIME_ZONE || 'Africa/Nairobi';
+let bioInterval;
 
-const updateAutoBio = async (Matrix) => {
-    if (!AUTO_BIO_ENABLED) return;
-
-    const update = async () => {
+export const initAutoBio = (Matrix) => {
+    const updateBio = async () => {
         try {
-            // Get current time in Libya
-            const now = new Date();
-            const options = { 
-                timeZone: TIMEZONE,
-                hour12: false,
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                weekday: 'long',
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric'
-            };
+            const now = moment().tz(TIMEZONE);
+            const timeStr = now.format('HH:mm:ss');
+            const dayStr = now.format('dddd');
+            const dateStr = now.format('DD MMMM YYYY');
+            const bioText = `⏰ ${timeStr} | ${dayStr} | 📅 ${dateStr} | ${MASTER_NAME}`;
             
-            const timeStr = now.toLocaleTimeString('en-US', options);
-            const dateStr = now.toLocaleDateString('en-US', options);
-            const dayStr = now.toLocaleDateString('en-US', { ...options, weekday: 'long' });
-            
-            // Format: ⏰ 23:03:54 | Monday | 📅 28 April 2025 | Marisel
-            const newBio = `⏰ ${timeStr} | ${dayStr} | 📅 ${dateStr} | ${MASTER_NAME}`;
-            
-            await Matrix.updateProfileStatus(newBio);
-            
+            await Matrix.updateProfileStatus(bioText);
+            console.log(chalk.green(`[AUTO-BIO] Updated: ${bioText}`));
         } catch (error) {
-            console.error('AutoBio Error:', error);
-        } finally {
-            // Schedule next update in 1 second
-            setTimeout(() => update(), 1000);
+            console.error(chalk.red('[AUTO-BIO] Error:'), error);
         }
     };
 
-    // Initial update
-    update();
-};
-
-// Start when bot is deployed
-export const initAutoBio = (Matrix) => {
-    updateAutoBio(Matrix);
-    console.log('AutoBio service started');
-};
-
-// Command to manually refresh
-const autobioCommand = async (m, Matrix) => {
-    const prefix = config.PREFIX;
-    const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+    // First update immediately
+    updateBio();
     
-    if (cmd === 'autobio') {
-        await updateAutoBio(Matrix);
-        return m.reply("Bio updated successfully!");
+    // Update every second
+    bioInterval = setInterval(updateBio, 1000);
+    console.log(chalk.yellow('[AUTO-BIO] Service started'));
+};
+
+export const stopAutoBio = () => {
+    if (bioInterval) {
+        clearInterval(bioInterval);
+        console.log(chalk.yellow('[AUTO-BIO] Service stopped'));
     }
 };
-
-export default autobioCommand;
