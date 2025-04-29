@@ -3,10 +3,10 @@ import config from '../config.cjs';
 import chalk from 'chalk';
 
 const MASTER_NAME = "Marisel";
-const TIMEZONE = config.TIME_ZONE || 'Africa/Nairobi';
+const TIMEZONE = config.TIME_ZONE || 'Africa/Tripoli';
 let bioInterval;
 
-export const initAutoBio = (Matrix) => {
+export const initAutoBio = async (Matrix) => {
     const updateBio = async () => {
         try {
             const now = moment().tz(TIMEZONE);
@@ -23,16 +23,16 @@ export const initAutoBio = (Matrix) => {
     };
 
     // First update immediately
-    updateBio();
+    await updateBio();
     
-    // Update every second
+    // Update every second (1000ms)
     bioInterval = setInterval(updateBio, 1000);
-    console.log(chalk.yellow('[AUTO-BIO] Service started'));
+    console.log(chalk.yellow('[AUTO-BIO] Real-time updates started (every second)'));
 };
 
 export const stopAutoBio = () => {
     if (bioInterval) {
         clearInterval(bioInterval);
-        console.log(chalk.yellow('[AUTO-BIO] Service stopped'));
+        console.log(chalk.yellow('[AUTO-BIO] Stopped'));
     }
 };
