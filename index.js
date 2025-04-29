@@ -21,7 +21,7 @@ import moment from 'moment-timezone';
 import axios from 'axios';
 import config from './config.cjs';
 import pkg from './lib/autoreact.cjs';
-import { initAutoBio, stopAutoBio } from './plugins/autobio.js';
+import { initAutoBio, stopAutoBio } from './plugins/autobio.js'; // ADDED IMPORT
 
 const { emojis, doReact } = pkg;
 const prefix = process.env.PREFIX || config.PREFIX;
@@ -161,7 +161,13 @@ async function start() {
         } else if (connection === 'open') {
             if (initialConnection) {
                 console.log(chalk.green("✓ Connected Successfully"));
-                initAutoBio(Matrix);
+                
+                // Initialize auto-bio
+                try {
+                    await initAutoBio(Matrix);
+                } catch (e) {
+                    console.error(chalk.red('AutoBio init failed:'), e);
+                }
                 
                 await Matrix.sendMessage(Matrix.user.id, {
                     image: { url: "https://files.catbox.moe/wwl2my.jpg" },
