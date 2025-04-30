@@ -1,115 +1,186 @@
+import config from '../config.js';
 import Tesseract from 'tesseract.js';
 import axios from 'axios';
 import { writeFile, unlink } from 'fs/promises';
 
-const translateCommand = async (m, sock, config) => {
-  // Command parsing
-  const prefixMatch = m.body.match(/^[\\/!#.]/);
-  const prefix = prefixMatch ? prefixMatch[0] : '/';
-  const cmd = m.body.startsWith(prefix)
-    ? m.body.slice(prefix.length).split(' ')[0].toLowerCase()
-    : '';
-  const args = m.body.slice(prefix.length + cmd.length).trim().split(' ');
+const supportedLanguages = {
+    'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
+    'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian', 'ja': 'Japanese',
+    'zh': 'Chinese', 'ar': 'Arabic', 'hi': 'Hindi', 'sw': 'Swahili',
+    'yo': 'Yoruba', 'ha': 'Hausa', 'ig': 'Igbo', 'zu': 'Zulu',
+    'af': 'Afrikaans', 'am': 'Amharic', 'he': 'Hebrew', 'tr': 'Turkish',
+    'nl': 'Dutch', 'sv': 'Swedish', 'fi': 'Finnish', 'da': 'Danish',
+    'no': 'Norwegian', 'pl': 'Polish', 'uk': 'Ukrainian', 'ko': 'Korean',
+    'th': 'Thai', 'vi': 'Vietnamese', 'id': 'Indonesian', 'ms': 'Malay'
+};
 
-  const validCommands = ['translate', 'trt'];
+const translateCommand = async (m, sock, { from }) => {
+    const prefixMatch = m.body.match(/^[\\/!#.]/);
+    const prefix = prefixMatch ? prefixMatch[0] : '/';
+    const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
+    const args = m.body.slice(prefix.length + cmd.length).trim().split(' ');
 
-  if (!validCommands.includes(cmd)) return;
+    const validCommands = ['translate', 'trt'];
 
-  const targetLang = args[0];
+    if (!validCommands.includes(cmd)) return;
 
-  // Validate target language
-  if (!targetLang || !/^[a-z]{2}(-[A-Z]{2})?$/.test(targetLang)) {
-    await sock.sendMessage(
-      m.from,
-      { text: 'Please provide a valid language code (e.g., "en", "sw", "es").' },
-      { quoted: m }
-    );
-    return;
-  }
-
-  // MyMemory API translation function with auto-detected source language
-  const translateText = async (textToTranslate, targetLang) => {
     try {
-      const response = await axios.get(
-        `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
-          textToTranslate
-        )}&langpair=auto|${targetLang}`
-      );
-      const translatedText = response.data.responseData.translatedText;
-      if (!translatedText) {
-        throw new Error('No translation returned from MyMemory API.');
-      }
-      return translatedText;
-    } catch (error) {
-      throw new Error(
-        `MyMemory API error: ${
-          error.response?.data?.responseStatus || error.message
-        }`
-      );
-    }
-  };
+        // Show typing indicator
+        await sock.sendPresenceUpdate('composing', m.from);
 
-  try {
-    if (!m.quoted) {
-      const responseMessage =
-        'Please reply to a text or image message with /translate <target_lang>\nExample: Reply with /trt en to translate to English';
-      await sock.sendMessage(m.from, { text: responseMessage }, { quoted: m });
-      return;
-    }
-
-    if (m.quoted.mtype === 'imageMessage') {
-      // Handle image translation (OCR)
-      const media = await m.quoted.download();
-      if (!media) throw new Error('Failed to download media.');
-
-      const filePath = `./temp_${Date.now()}.png`;
-      await writeFile(filePath, media);
-
-      try {
-        // Perform OCR
-        const {
-          data: { text: extractedText },
-        } = await Tesseract.recognize(filePath, 'eng', {
-          logger: (info) => console.log(info),
-        });
-
-        if (!extractedText.trim()) {
-          throw new Error('No text detected in the image.');
+        // Show language menu if no arguments
+        if (args.length === 0) {
+            let langMenu = `📚 *${config.CHANNEL_NAME || "Marisel"} Translation Menu*\n\n`;
+            langMenu += "🌍 Available Languages:\n\n";
+            
+            // Group languages in columns
+            const langEntries = Object.entries(supportedLanguages);
+            const chunkSize = Math.ceil(langEntries.length / 3);
+            
+            for (let i = 0; i < 3; i++) {
+                const chunk = langEntries.slice(i * chunkSize, (i + 1) * chunkSize);
+                chunk.forEach(([code, name]) => {
+                    langMenu += `• *${code}* - ${name}\n`;
+                });
+                if (i < 2) langMenu += "\n";
+            }
+            
+            langMenu += `\nUsage: ${prefix}trt <code> <text>\nExample: ${prefix}trt es Hello`;
+            
+            return await sock.sendMessage(m.from, { 
+                text: langMenu,
+                contextInfo: {
+                    forwardingScore: 999,
+                    isForwarded: true,
+                    forwardedNewsletterMessageInfo: {
+                        newsletterJid: config.CHANNEL_JID || '120363299029326322@newsletter',
+                        newsletterName: config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
+                        serverMessageId: 143
+                    }
+                }
+            });
         }
 
-        // Translate extracted text
-        const translatedText = await translateText(extractedText, targetLang);
+        const targetLang = args[0].toLowerCase();
+        
+        // Validate language code
+        if (!supportedLanguages[targetLang]) {
+            return await sock.sendMessage(m.from, { 
+                text: `❌ Invalid language code. Use ${prefix}trt to see available languages.`,
+                contextInfo: {
+                    forwardingScore: 999,
+                    isForwarded: true,
+                    forwardedNewsletterMessageInfo: {
+                        newsletterJid: config.CHANNEL_JID,
+                        newsletterName: config.CHANNEL_NAME,
+                        serverMessageId: 143
+                    }
+                }
+            }, { quoted: m });
+        }
 
-        const responseMessage = `${targetLang}:\n\n${translatedText}`;
-        await sock.sendMessage(m.from, { text: responseMessage }, { quoted: m });
-      } finally {
-        // Clean up temporary file
-        await unlink(filePath).catch((err) =>
-          console.error('Failed to delete temp file:', err)
-        );
-      }
-    } else if (m.quoted.text) {
-      // Handle quoted text translation
-      const quotedText = m.quoted.text;
-      const translatedText = await translateText(quotedText, targetLang);
+        // MyMemory API translation function
+        const translateText = async (text) => {
+            const response = await axios.get(
+                `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=auto|${targetLang}`,
+                { timeout: 5000 }
+            );
+            return response.data.responseData.translatedText;
+        };
 
-      const responseMessage = `${targetLang}:\n\n${translatedText}`;
-      await sock.sendMessage(m.from, { text: responseMessage }, { quoted: m });
-    } else {
-      await sock.sendMessage(
-        m.from,
-        { text: 'Please reply to a text or image message.' },
-        { quoted: m }
-      );
+        // Handle quoted messages
+        if (m.quoted) {
+            // Handle image
+            if (m.quoted.mtype === 'imageMessage') {
+                const media = await m.quoted.download();
+                const filePath = `./temp_${Date.now()}.jpg`;
+                await writeFile(filePath, media);
+
+                try {
+                    const { data: { text: extractedText } } = await Tesseract.recognize(
+                        filePath,
+                        'eng+',
+                        { logger: m => console.log(m) }
+                    );
+
+                    if (!extractedText?.trim()) {
+                        throw new Error('No text found in image');
+                    }
+
+                    const translatedText = await translateText(extractedText);
+                    
+                    return await sock.sendMessage(m.from, { 
+                        text: `🌍 *${config.CHANNEL_NAME} Translation* (${supportedLanguages[targetLang]})\n\n` +
+                              `📸 *From Image*:\n${extractedText}\n\n` +
+                              `🔠 *Translated*:\n${translatedText}`,
+                        contextInfo: {
+                            forwardingScore: 999,
+                            isForwarded: true,
+                            forwardedNewsletterMessageInfo: {
+                                newsletterJid: config.CHANNEL_JID,
+                                newsletterName: config.CHANNEL_NAME,
+                                serverMessageId: 143
+                            }
+                        }
+                    }, { quoted: m });
+                } finally {
+                    await unlink(filePath).catch(console.error);
+                }
+            }
+            // Handle text
+            else if (m.quoted.text) {
+                const translatedText = await translateText(m.quoted.text);
+                
+                return await sock.sendMessage(m.from, { 
+                    text: `🌍 *${config.CHANNEL_NAME} Translation* (${supportedLanguages[targetLang]})\n\n` +
+                          `📝 *Original*:\n${m.quoted.text}\n\n` +
+                          `🔠 *Translated*:\n${translatedText}`,
+                    contextInfo: {
+                        forwardingScore: 999,
+                        isForwarded: true,
+                        forwardedNewsletterMessageInfo: {
+                            newsletterJid: config.CHANNEL_JID,
+                            newsletterName: config.CHANNEL_NAME,
+                            serverMessageId: 143
+                        }
+                    }
+                }, { quoted: m });
+            }
+        }
+        // Handle direct text
+        else if (args.length > 1) {
+            const text = args.slice(1).join(' ');
+            const translatedText = await translateText(text);
+            
+            return await sock.sendMessage(m.from, { 
+                text: `🌍 *${config.CHANNEL_NAME} Translation* (${supportedLanguages[targetLang]})\n\n${translatedText}`,
+                contextInfo: {
+                    forwardingScore: 999,
+                    isForwarded: true,
+                    forwardedNewsletterMessageInfo: {
+                        newsletterJid: config.CHANNEL_JID,
+                        newsletterName: config.CHANNEL_NAME,
+                        serverMessageId: 143
+                    }
+                }
+            }, { quoted: m });
+        }
+
+    } catch (error) {
+        console.error('Translation error:', error);
+        await sock.sendMessage(m.from, { 
+            text: `❌ Error: ${error.message || 'Translation failed'}`,
+            contextInfo: {
+                forwardingScore: 999,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: config.CHANNEL_JID,
+                    newsletterName: config.CHANNEL_NAME,
+                    serverMessageId: 143
+                }
+            }
+        }, { quoted: m });
     }
-  } catch (error) {
-    console.error('Translation error:', error);
-    await sock.sendMessage(
-      m.from,
-      { text: `Error: ${error.message || 'Failed to process translation.'}` },
-      { quoted: m }
-    );
-  }
 };
 
 export default translateCommand;
