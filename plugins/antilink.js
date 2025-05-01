@@ -1,80 +1,104 @@
 import config from "../config.cjs";
 
-const antilinkDB = new Map(); // Temporary in-memory storage
+const antilinkDB = new Map(); // { groupJid: boolean }
+const warnedUsersDB = new Map(); // { groupJid: Map<userJid, warningCount> }
 
 const antiLink = async (m, gss) => {
   try {
-    const cmd = m.body.toLowerCase().trim();
+    const cmd = m.body?.toLowerCase().trim();
 
-    // Enable antilink
-    if (cmd === "antilink on") {
-      if (!m.isGroup) return m.reply("*Command reserved for groups only*\n\n> *Try it in a group*");
-
+    // Command handling
+    if (cmd === "antilink on" || cmd === "antilink off") {
+      if (!m.isGroup) return m.reply("This command works only in groups!");
+      
       const groupMetadata = await gss.groupMetadata(m.from);
-      const participants = groupMetadata.participants;
-      const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
+      const senderAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin;
 
-      if (!senderAdmin) {
-        return m.reply("*Command for admins only*\n\n> *Request admin role*");
+      if (!senderAdmin && m.sender !== config.OWNER_NUMBER + '@s.whatsapp.net') {
+        return m.reply("Only admins can control antilink!");
       }
 
-      antilinkDB.set(m.from, true);
-      return m.reply("*Anti-Link is now activated for this group.*\n\n> *Be warned: Do not send links.*");
-    }
-
-    // Disable antilink
-    if (cmd === "antilink off") {
-      if (!m.isGroup) return m.reply("*Command only for groups!*\n\n> *Please try it in a group*");
-
-      const groupMetadata = await gss.groupMetadata(m.from);
-      const participants = groupMetadata.participants;
-      const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
-
-      if (!senderAdmin) {
-        return m.reply("*Only admins can disable Anti-Link!*\n\n> *Smile in pain*");
+      if (cmd === "antilink on") {
+        antilinkDB.set(m.from, true);
+        warnedUsersDB.set(m.from, new Map());
+        return m.reply("🔗 Anti-Link activated\n> Links will be automatically handled");
+      } else {
+        antilinkDB.delete(m.from);
+        warnedUsersDB.delete(m.from);
+        return m.reply("Anti-Link deactivated");
       }
-
-      antilinkDB.delete(m.from);
-      return m.reply("*Anti-Link is now disabled for this group.*\n\n> *I'll be back soon*");
     }
 
-    // **🔹 AUTO-DETECT LINKS AND DELETE THEM**
-    if (antilinkDB.get(m.from)) {
-      const linkRegex = /(https?:\/\/[^\s]+)/g;
+    // Link detection
+    if (antilinkDB.get(m.from) && m.body) {
+      const linkRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|(wa\.me\/[^\s]+)/gi;
       if (linkRegex.test(m.body)) {
-        // Get group metadata
         const groupMetadata = await gss.groupMetadata(m.from);
-        const participants = groupMetadata.participants;
+        const participant = groupMetadata.participants.find(p => p.id === m.sender);
+        
+        // Always delete the message first
+        await gss.sendMessage(m.from, { delete: m.key });
 
-        // Check if the sender is an admin
-        const senderAdmin = participants.find(p => p.id === m.sender)?.admin;
+        // Protected senders (bot owner and bot itself)
+        const protectedSenders = [
+          config.OWNER_NUMBER + '@s.whatsapp.net',
+          gss.user.id
+        ];
 
-        if (senderAdmin) {
-          // If the sender is an admin, do not take any action
+        if (protectedSenders.includes(m.sender)) return;
+
+        // Check if sender is admin
+        const isAdmin = participant?.admin;
+
+        if (isAdmin) {
+          // For admins: Just delete, no warnings
           return;
         }
 
-        // Delete the message
-        await gss.sendMessage(m.from, { delete: m.key });
+        // For non-admins: Warning system
+        const warnedUsers = warnedUsersDB.get(m.from) || new Map();
+        const warningCount = (warnedUsers.get(m.sender) || 0) + 1;
+        warnedUsers.set(m.sender, warningCount);
+        warnedUsersDB.set(m.from, warnedUsers);
 
-        // Warn the user
-        await m.reply(`*Links are not allowed in this group!*\n\n> *This is your first warning.*`);
-
-        // Track warned users
-        const warnedUsers = antilinkDB.get(m.from + "_warned") || new Set();
-        if (warnedUsers.has(m.sender)) {
-          // Remove the user if they repeat the violation
-          await gss.groupParticipantsUpdate(m.from, [m.sender], 'remove');
-          return m.reply(`*${m.sender.split('@')[0]} has been removed for sending links.*`);
+        // Remove after 3 violations
+        if (warningCount >= 3) {
+          try {
+            const botAdmin = groupMetadata.participants.find(p => p.id === gss.user.id)?.admin;
+            if (!botAdmin) {
+              await gss.sendMessage(
+                m.from,
+                { text: `⚠️ @${m.sender.split('@')[0]} reached 3 violations but I need admin to remove` },
+                { mentions: [m.sender] }
+              );
+              return;
+            }
+            
+            await gss.groupParticipantsUpdate(m.from, [m.sender], 'remove');
+            await gss.sendMessage(
+              m.from, 
+              {
+                text: `🚫 @${m.sender.split('@')[0]} removed for sending links\n> Violations: 3/3`,
+                mentions: [m.sender]
+              }
+            );
+            warnedUsers.delete(m.sender);
+          } catch (error) {
+            console.error("Removal error:", error);
+          }
         } else {
-          warnedUsers.add(m.sender);
-          antilinkDB.set(m.from + "_warned", warnedUsers);
+          await gss.sendMessage(
+            m.from,
+            {
+              text: `⚠️ @${m.sender.split('@')[0]} - Links not allowed!\n> Warnings: ${warningCount}/3`,
+              mentions: [m.sender]
+            }
+          );
         }
       }
     }
   } catch (error) {
-    console.error("Error in Anti-Link:", error);
-    m.reply("*⚠️ An error occurred while processing Anti-Link.*\n\n> *Please try again later*");
+    console.error("AntiLink Error:", error);
   }
 };
 
