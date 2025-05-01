@@ -1,70 +1,141 @@
 import fetch from 'node-fetch';
-import config from '../config.cjs';
 
-const pairDevice = async (m, gss) => {
+const pair = async (m, sock) => {
     try {
-        const prefix = config.PREFIX;
-        const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(' ')[0].toLowerCase() : '';
-        const args = m.body.slice(prefix.length + cmd.length).trim();
-
-        // Newsletter configuration
-        const newsletterContext = {
-            forwardingScore: 999,
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-                newsletterJid: config.CHANNEL_JID || '120363299029326322@newsletter',
-                newsletterName: config.CHANNEL_NAME || "𝖒𝖆𝖗𝖎𝖘𝖊𝖑",
-                serverMessageId: 143
-            }
-        };
-
-        // Check if command matches
-        if (cmd !== 'pair' && cmd !== 'getpair' && cmd !== 'clonebot') return;
-
-        // Validate arguments
-        if (!args) {
-            return m.reply(`*Usage Example:* ${prefix}pair +25474000XX\n\n*Use this code to link your WhatsApp via Linked Devices*`);
-        }
-
-        // Validate phone number format
-        if (!args.match(/^\+?[0-9]{10,15}$/)) {
-            return m.reply("❌ Invalid phone number format. Please include country code.\nExample: +9234275822XX");
-        }
-
-        const response = await fetch(`https://sessio-6645ccddfbba.herokuapp.com/pair?phone=${encodeURIComponent(args)}`);
-        const pair = await response.json();
-
-        if (!pair?.code) {
-            return m.reply("❌ Failed to generate pairing code. Please check:\n1. Phone number format\n2. API service status\n3. Try again later");
-        }
-
-        const pairingCode = pair.code;
-        const formattedMessage = `⬤─── *𝖒𝖆𝖗𝖎𝖘𝖊𝖑* ───⬤
-
-📱 *Phone Number:* ${args}
-🔢 *Pairing Code:* ${pairingCode}
-
-╰──────────⊷  
-⚡ *How to use:*
-1. Open WhatsApp > Settings
-2. Tap "Linked Devices"
-3. Select "Link a Device"
-4. Enter this code when prompted
-
-📌 *Note:* Code expires in 20 seconds`;
-
-        await m.reply(formattedMessage);
+        const body = m.body?.toLowerCase().trim();
         
-        // Send raw code separately for easy copy
-        await gss.sendMessage(m.from, { 
-            text: pairingCode,
-            contextInfo: newsletterContext
-        }, { quoted: m });
+        // Enhanced trigger phrases with regex for better matching
+        const triggers = [
+            /(get|generate|create)\s*(pair|pairing|session)/i,
+            /whatsapp\s*pair/i,
+            /qr\s*code/i
+        ];
+        
+        if (!triggers.some(trigger => trigger.test(body))) {
+            return;
+        }
+
+        // Extract phone number from message with better validation
+        const numberMatch = m.body.match(/(?:\+|00)?[\d\s-]{10,15}/);
+        if (!numberMatch) {
+            return await sock.sendMessage(
+                m.from,
+                {
+                    text: "📱 *Phone Number Required*\n\n" +
+                          "🔢 Please include a valid phone number:\n\n" +
+                          "• International format: `+1234567890`\n" +
+                          "• Local format: `1234567890`\n\n" +
+                          "💡 Example: `generate pair +1234567890`",
+                    contextInfo: {
+                        externalAdReply: {
+                            title: "WhatsApp Pairing System",
+                            body: "Need help? Type 'pair help'",
+                            mediaType: 1
+                        }
+                    }
+                },
+                { quoted: m }
+            );
+        }
+
+        const phoneNumber = numberMatch[0].replace(/[\s-]/g, '');
+        await m.React('⏳');
+
+        // Debug: Log the API request
+        console.log(`Making API request for number: ${phoneNumber}`);
+        
+        const apiUrl = `https://sessio-6645ccddfbba.herokuapp.com/pair?phone=${encodeURIComponent(phoneNumber)}`;
+        const startTime = Date.now();
+        
+        const response = await fetch(apiUrl, {
+            timeout: 15000,
+            headers: {
+                'Accept': 'application/json',
+                'User-Agent': 'WhatsAppPairBot/1.0'
+            }
+        });
+
+        // Debug: Log response status and timing
+        console.log(`API response (${Date.now() - startTime}ms):`, {
+            status: response.status,
+            headers: Object.fromEntries(response.headers.entries())
+        });
+
+        // First get the response as text to handle both JSON and non-JSON
+        const responseText = await response.text();
+        
+        try {
+            const data = JSON.parse(responseText);
+            
+            if (!data?.success) {
+                throw new Error(data?.message || 'API returned unsuccessful response');
+            }
+
+            // Format the response
+            const responseText = 
+                `✨ *New Session Created* ✨\n\n` +
+                `📱 *For Number:* \`${phoneNumber}\`\n` +
+                `🔐 *Pairing Code:* \`${data.pairing_code}\`\n` +
+                `⏳ *Expires in:* ${data.expires_in || '5 minutes'}\n\n` +
+                `📌 *Instructions:*\n` +
+                `1. Open WhatsApp on your phone\n` +
+                `2. Go to Settings → Linked Devices\n` +
+                `3. Enter this code when prompted\n\n` +
+                `⚠️ *Security Notice:* Never share this code!`;
+
+            await sock.sendMessage(
+                m.from,
+                {
+                    text: responseText,
+                    contextInfo: {
+                        externalAdReply: {
+                            title: "WhatsApp Pairing System",
+                            body: "Session created successfully",
+                            thumbnailUrl: data.qr_code_url || '',
+                            mediaType: 1,
+                            renderLargerThumbnail: true
+                        }
+                    }
+                },
+                { quoted: m }
+            );
+
+            await m.React('✅');
+
+        } catch (parseError) {
+            console.error('API Response Parsing Error:', {
+                responseText: responseText.substring(0, 200),
+                error: parseError
+            });
+            
+            throw new Error(`Invalid API response format: ${parseError.message}`);
+        }
 
     } catch (error) {
-        console.error('Pairing Error:', error);
-        await m.reply(`❌ Error: ${error.message}\nPlease try again or contact support.`);
+        console.error("Full Pairing Error:", {
+            error: error.stack || error,
+            message: m.body,
+            timestamp: new Date().toISOString()
+        });
+        
+        await m.React('❌');
+        
+        let errorMessage = "⚠️ *Session Creation Failed*\n\n";
+        
+        if (error.message.includes('Invalid API response') || 
+            error.message.includes('timed out')) {
+            errorMessage += "🔧 The pairing service is currently unavailable\n";
+            errorMessage += "Our team has been notified. Please try again later.";
+        } else {
+            errorMessage += `🚫 Error: ${error.message || 'Unknown error'}\n\n`;
+            errorMessage += "Possible solutions:\n";
+            errorMessage += "• Check the phone number format\n";
+            errorMessage += "• Ensure your number can receive WhatsApp\n";
+            errorMessage += "• Try again in 2 minutes";
+        }
+            
+        await sock.sendMessage(m.from, { text: errorMessage }, { quoted: m });
     }
 };
 
-export default pairDevice;
+export default pair;
