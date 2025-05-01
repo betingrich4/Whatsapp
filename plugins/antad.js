@@ -1,41 +1,39 @@
 import config from "../config.cjs";
 
-const stealthMode = async (m, gss) => {
+const remoteGroups = new Map(); // { groupJid: true }
+
+const remoteControl = async (m, gss) => {
   try {
-    // Check if message is from you (owner) in a locked group
-    if (m.sender === config.OWNER_NUMBER + '@s.whatsapp.net' && m.isGroup) {
-      const groupMetadata = await gss.groupMetadata(m.from);
-      const isAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin;
+    // Only process private messages from owner
+    if (!m.isGroup && m.sender === config.OWNER_NUMBER + '@s.whatsapp.net') {
+      const [command, groupJid, ...messageParts] = m.body.split(' ');
+      const message = messageParts.join(' ');
+
+      if (command === '!post') {
+        // Verify this is a group you control
+        if (remoteGroups.has(groupJid)) {
+          await gss.sendMessage(
+            groupJid,
+            { 
+              text: `📢 ${message}`,
+              footer: "Official Notification",
+              buttons: [
+                { buttonId: '!viewdocs', buttonText: { displayText: 'View Documents' }, type: 1 }
+              ]
+            }
+          );
+          return m.reply(`✅ Message sent to group ${groupJid}`);
+        }
+      }
       
-      // If group is locked and you're not admin
-      if (!isAdmin && m.body.startsWith('!send ')) {
-        const message = m.body.replace('!send ', '');
-        
-        // Send as bot (stealth mode)
-        await gss.sendMessage(
-          m.from, 
-          { 
-            text: message,
-            footer: "Bot Notification",
-            templateButtons: [
-              {
-                urlButton: {
-                  displayText: "View Docs",
-                  url: "https://drive.google.com"
-                }
-              }
-            ]
-          }
-        );
-        
-        // Delete your original message
-        await gss.sendMessage(m.from, { delete: m.key });
-        return;
+      if (command === '!register') {
+        remoteGroups.set(groupJid, true);
+        return m.reply(`✅ Group ${groupJid} registered for remote posting`);
       }
     }
   } catch (error) {
-    console.error("Stealth Error:", error);
+    console.error("Remote Error:", error);
   }
 };
 
-export default stealthMode;
+export default remoteControl;
