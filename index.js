@@ -22,7 +22,6 @@ import axios from 'axios';
 import config from './config.cjs';
 import pkg from './lib/autoreact.cjs';
 import { initAutoBio, stopAutoBio } from './plugins/autobio.js'; // ADDED IMPORT
-import antiPMHandler from './plugins/antiPM.js';
 
 const { emojis, doReact } = pkg;
 const prefix = process.env.PREFIX || config.PREFIX;
