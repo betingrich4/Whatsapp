@@ -15,22 +15,22 @@ const antistickerCommand = async (m, Matrix) => {
     // Handle toggles
     if (text === 'antisticker on') {
         if (!isAdmin && !isOwner) {
-            await Matrix.sendMessage(m.from, { text: '*ᴏᴡɴᴇʀ ᴄᴏᴍᴍᴀɴᴅ*' }, { quoted: m });
+            await Matrix.sendMessage(m.from, { text: '*OWNER or ADMIN COMMAND ONLY*' }, { quoted: m });
             return;
         }
 
         global.antisticker[m.from] = true;
-        await Matrix.sendMessage(m.from, { text: '*ᴀɴᴛɪsᴛɪᴄᴋᴇᴛ ᴇɴᴀʙʟᴇᴅ* in this group.' }, { quoted: m });
+        await Matrix.sendMessage(m.from, { text: '*Antisticker is now enabled in this group.*' }, { quoted: m });
     }
 
     if (text === 'antisticker off') {
         if (!isAdmin && !isOwner) {
-            await Matrix.sendMessage(m.from, { text: '*ᴏᴡɴᴇʀ ᴄᴏᴍᴍᴀɴᴅ*' }, { quoted: m });
+            await Matrix.sendMessage(m.from, { text: '*OWNER or ADMIN COMMAND ONLY*' }, { quoted: m });
             return;
         }
 
         global.antisticker[m.from] = false;
-        await Matrix.sendMessage(m.from, { text: '*ᴀɴᴛɪsᴛɪᴄᴋᴇʀ ᴅɪsᴀʙʟᴇᴅ*' }, { quoted: m });
+        await Matrix.sendMessage(m.from, { text: '*Antisticker is now disabled in this group.*' }, { quoted: m });
     }
 
     // Auto-delete stickers if feature is on
