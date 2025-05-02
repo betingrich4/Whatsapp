@@ -1,44 +1,45 @@
-import config from "../config.cjs";
+import config from '../config.cjs';
 
-const antistickerDB = new Map(); // { groupJid: boolean }
+const antitag = async (m, Matrix) => {
+    if (!m.from.endsWith('@g.us')) return; // Only works in groups
 
-const antisticker = async (m, gss) => {
-  try {
-    const cmd = m.body?.toLowerCase().trim();
+    const text = m.body?.toLowerCase()?.trim() || '';
+    const isOwner = [config.OWNER_NUMBER + '@s.whatsapp.net'].includes(m.sender);
+    const isBot = m.sender === Matrix.user.id.split(':')[0] + '@s.whatsapp.net';
 
-    // Command handling (ON/OFF)
-    if (cmd === "antisticker on" || cmd === "antisticker off") {
-      if (!m.isGroup) return m.reply("This command works only in groups!");
-      
-      const groupMetadata = await gss.groupMetadata(m.from);
-      const senderAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin;
+    // Initialize group settings
+    if (!global.antitag) global.antitag = {};
+    if (!global.antitag[m.from]) global.antitag[m.from] = false;
 
-      if (!senderAdmin && m.sender !== config.OWNER_NUMBER + '@s.whatsapp.net') {
-        return m.reply("Only admins can control antisticker!");
-      }
-
-      if (cmd === "antisticker on") {
-        antistickerDB.set(m.from, true);
-        return m.reply("🔇 Silent antisticker activated\n> All non-owner stickers will be deleted");
-      } else {
-        antistickerDB.delete(m.from);
-        return m.reply("Antisticker deactivated");
-      }
+    // Exact trigger word matching (no prefix)
+    if (text === 'antitag on') {
+        if (!isOwner && !isBot) return; // Only owner/bot can enable
+        global.antitag[m.from] = true;
+        return Matrix.sendMessage(m.from, { text: '🔒 Mention protection activated' });
     }
 
-    // Sticker handling - GROUPS ONLY
-    if (m.isGroup && m.mtype === 'stickerMessage' && antistickerDB.get(m.from)) {
-      // NEVER DELETE OWNER'S STICKERS
-      if (m.sender === config.OWNER_NUMBER + '@s.whatsapp.net') {
-        return; 
-      }
-
-      // Delete all other stickers (members + admins)
-      await gss.sendMessage(m.from, { delete: m.key });
+    if (text === 'antitag off') {
+        if (!isOwner && !isBot) return; // Only owner/bot can disable
+        global.antitag[m.from] = false;
+        return Matrix.sendMessage(m.from, { text: '🔓 Mention protection deactivated' });
     }
-  } catch (error) {
-    console.error("Antisticker Error:", error);
-  }
+
+    // Protection logic (no command needed)
+    if (global.antitag[m.from] && m.mentionedJid?.length) {
+        const botNumber = Matrix.user.id.split(':')[0] + '@s.whatsapp.net';
+        const ownerNumber = config.OWNER_NUMBER + '@s.whatsapp.net';
+        
+        const mentionedBot = m.mentionedJid.includes(botNumber);
+        const mentionedOwner = m.mentionedJid.includes(ownerNumber);
+        
+        if ((mentionedBot || mentionedOwner) && !isOwner && !isBot) {
+            await Matrix.sendMessage(m.from, {
+                text: `@${m.sender.split('@')[0]} Don't tag ${mentionedBot ? 'me' : 'the owner'}!`,
+                mentions: [m.sender]
+            });
+            await Matrix.sendMessage(m.from, { delete: m.key });
+        }
+    }
 };
 
-export default antisticker;
+export default antitag;
