@@ -13,13 +13,13 @@ const antisticker = async (m, gss) => {
       const groupMetadata = await gss.groupMetadata(m.from);
       const senderAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin;
 
-      if (!senderAdmin && m.sender !== config.OWNER_NUMBER + '@s.whatsapp.net') {
-        return m.reply("Only admins can control antisticker!");
+      if (!senderAdmin) {
+        return m.reply("*Only admins can control antisticker!*");
       }
 
       if (cmd === "antisticker on") {
         antistickerDB.set(m.from, true);
-        return m.reply("🔕 Silent antisticker activated\n> Stickers from others will be auto-deleted");
+        return m.reply("*Silent antisticker activated*\n> Stickers from others will be auto-deleted");
       } else {
         antistickerDB.delete(m.from);
         return m.reply("Antisticker deactivated");
@@ -28,30 +28,31 @@ const antisticker = async (m, gss) => {
 
     // Sticker handling
     if (m.mtype === 'stickerMessage') {
-      // PM Handling: Only delete stickers sent TO you
+      // DM Handling: Delete stickers sent TO the user, but not their own
       if (!m.isGroup) {
-        if (m.sender === config.OWNER_NUMBER + '@s.whatsapp.net') return; // Allow owner to send
-        if (m.sender === m.from) { // Someone sent you a sticker
-          await gss.sendMessage(m.from, { delete: m.key }); // Silent delete
+        if (m.sender === m.key.participant || m.sender === m.from) {
+          return; // Don't delete user's own stickers in DMs
         }
+        // Delete stickers sent to the user by others
+        await gss.sendMessage(m.from, { delete: m.key });
         return;
       }
 
-      // Group Handling
+      // Group Handling: Only delete others' stickers if antisticker is ON and user is admin
       if (antistickerDB.get(m.from)) {
-        // NEVER DELETE THESE SENDERS' STICKERS:
-        const protectedSenders = [
-          config.OWNER_NUMBER + '@s.whatsapp.net', // You (owner)
-          gss.user.id,                             // The bot itself
-        ];
+        const groupMetadata = await gss.groupMetadata(m.from);
+        const senderAdmin = groupMetadata.participants.find(p => p.id === m.sender)?.admin;
+        const botUserAdmin = groupMetadata.participants.find(p => p.id === gss.user.id)?.admin;
 
-        if (protectedSenders.includes(m.sender)) {
-          console.log("Protected sender - sticker not deleted");
+        // Don't delete the user's stickers or the bot's stickers
+        if (m.sender === gss.user.id || m.sender === m.key.participant) {
           return;
         }
 
-        // Delete all other stickers (members + other admins)
-        await gss.sendMessage(m.from, { delete: m.key }); // Silent delete
+        // Only delete if the bot's user is an admin
+        if (botUserAdmin) {
+          await gss.sendMessage(m.from, { delete: m.key });
+        }
       }
     }
   } catch (error) {
