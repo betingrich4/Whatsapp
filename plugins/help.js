@@ -1,431 +1,218 @@
-import moment from "moment-timezone";
-import fs from "fs";
-import os from "os";
-import pkg from "baileys-pro";
+import moment from 'moment-timezone';
+import fs from 'fs';
+import os from 'os';
+import pkg, { prepareWAMessageMedia } from '@whiskeysockets/baileys';
 const { generateWAMessageFromContent, proto } = pkg;
-import config from "../config.cjs";
-import axios from "axios";
 
-// Time logic
-const xtime = moment.tz("Africa/Nairobi").format("HH:mm:ss");
-const xdate = moment.tz("Africa/Nairobi").format("DD/MM/YYYY");
-const time2 = moment().tz("Africa/Nairobi").format("HH:mm:ss");
-let pushwish = "";
+// Utility functions
+const formatBytes = (bytes) => {
+  if (bytes >= Math.pow(1024, 3)) return (bytes / Math.pow(1024, 3)).toFixed(2) + ' GB';
+  if (bytes >= Math.pow(1024, 2)) return (bytes / Math.pow(1024, 2)).toFixed(2) + ' MB';
+  if (bytes >= 1024) return (bytes / 1024).toFixed(2) + ' KB';
+  return bytes.toFixed(2) + ' bytes';
+};
 
-if (time2 < "05:00:00") {
-  pushwish = `Good Morning 🌄`;
-} else if (time2 < "11:00:00") {
-  pushwish = `Good Morning 🌄`;
-} else if (time2 < "15:00:00") {
-  pushwish = `Good Afternoon 🌅`;
-} else if (time2 < "18:00:00") {
-  pushwish = `Good Evening 🌃`;
-} else if (time2 < "19:00:00") {
-  pushwish = `Good Evening 🌃`;
-} else {
-  pushwish = `Good Night 🌌`;
-}
+// System info
+const totalMemoryBytes = os.totalmem();
+const freeMemoryBytes = os.freemem();
+const uptime = process.uptime();
+const day = Math.floor(uptime / (24 * 3600));
+const hours = Math.floor((uptime % (24 * 3600)) / 3600);
+const minutes = Math.floor((uptime % 3600) / 60);
+const seconds = Math.floor(uptime % 60);
 
-// Fancy font utility
-function toFancyFont(text, isUpperCase = false) {
-  const fonts = {
-    A: "𝘼",
-    B: "𝘽",
-    C: "𝘾",
-    D: "𝘿",
-    E: "𝙀",
-    F: "𝙁",
-    G: "𝙂",
-    H: "𝙃",
-    I: "𝙄",
-    J: "𝙅",
-    K: "𝙆",
-    L: "𝙇",
-    M: "𝙈",
-    N: "𝙉",
-    O: "𝙊",
-    P: "𝙋",
-    Q: "𝙌",
-    R: "𝙍",
-    S: "𝙎",
-    T: "𝙏",
-    U: "𝙐",
-    V: "𝙑",
-    W: "𝙒",
-    X: "𝙓",
-    Y: "𝙔",
-    Z: "𝙕",
-    a: "𝙖",
-    b: "𝙗",
-    c: "𝙘",
-    d: "𝙙",
-    e: "𝙚",
-    f: "𝙛",
-    g: "𝙜",
-    h: "𝙝",
-    i: "𝙞",
-    j: "𝙟",
-    k: "𝙠",
-    l: "𝙡",
-    m: "𝙢",
-    n: "𝙣",
-    o: "𝙤",
-    p: "𝙥",
-    q: "𝙦",
-    r: "𝙧",
-    s: "𝙨",
-    t: "𝙩",
-    u: "𝙪",
-    v: "𝙫",
-    w: "𝙬",
-    x: "𝙭",
-    y: "𝙮",
-    z: "𝙯",
-  };
-  const formattedText = isUpperCase ? text.toUpperCase() : text.toLowerCase();
-  return formattedText
-    .split("")
-    .map((char) => fonts[char] || char)
-    .join("");
-}
+// Time-based greeting
+const getGreeting = () => {
+  const time = moment().tz("Africa/Nairobi").format("HH:mm:ss");
+  if (time < "05:00:00") return "Good Morning 🌄";
+  if (time < "11:00:00") return "Good Morning 🌄";
+  if (time < "15:00:00") return "Good Afternoon 🌅";
+  if (time < "18:00:00") return "Good Evening 🌃";
+  if (time < "19:00:00") return "Good Evening 🌃";
+  return "Good Night 🌌";
+};
 
-// Image fetch utility
-async function fetchMenuImage() {
-  const primaryUrl = "https://files.catbox.moe/y2utve.jpg";
-  const fallbackUrl = "https://files.catbox.moe/9kL5x9Q.jpg";
-  for (let i = 0; i < 3; i++) {
-    try {
-      const response = await axios.get(primaryUrl, { responseType: "arraybuffer" });
-      return Buffer.from(response.data, "binary");
-    } catch (error) {
-      if (error.response?.status === 429 && i < 2) {
-        console.log(`Rate limit hit, retrying in 2s...`);
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        continue;
+// Menu categories
+const menuCategories = {
+  "ALL MENU": {
+    description: "Show all available commands",
+    commands: [
+      `${prefix}Attp`, `${prefix}Attp2`, `${prefix}Attp3`, `${prefix}Binary`, 
+      `${prefix}Emojimix`, `${prefix}Mp3`, `${prefix}Ai`, `${prefix}Bug`,
+      // ... add all other commands
+    ]
+  },
+  "DOWNLOADER MENU": {
+    description: "Downloader related commands",
+    commands: [
+      `${prefix}Apk`, `${prefix}Facebook`, `${prefix}Mediafire`,
+      `${prefix}Pinterestdl`, `${prefix}Gitclone`, `${prefix}Gdrive`,
+      // ... other download commands
+    ]
+  },
+  // ... other categories
+};
+
+const test = async (m, Matrix) => {
+  const prefix = /^[\\/!#.]/gi.test(m.body) ? m.body.match(/^[\\/!#.]/gi)[0] : '.';
+  const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).toLowerCase() : '';
+  
+  if (['list', 'help', 'menu'].includes(cmd)) {
+    const greeting = getGreeting();
+    const mode = process.env.MODE || 'public';
+    
+    // Create interactive message with buttons
+    const msg = generateWAMessageFromContent(m.from, {
+      viewOnceMessage: {
+        message: {
+          interactiveMessage: proto.Message.InteractiveMessage.create({
+            header: proto.Message.InteractiveMessage.Header.create({
+              ...(await prepareWAMessageMedia({ 
+                image: fs.readFileSync('./src/ethix.jpg')
+              }, { upload: Matrix.waUploadToServer })),
+              title: "Marisel",
+              subtitle: greeting
+            }),
+            body: proto.Message.InteractiveMessage.Body.create({
+              text: `╭─────────────━┈⊷
+│🤖 ʙᴏᴛ ɴᴀᴍᴇ: *Web Bot*
+│📍 ᴠᴇʀꜱɪᴏɴ: 2.0.3
+│👨‍💻 ᴏᴡɴᴇʀ : *Marisel*      
+│👤 ɴᴜᴍʙᴇʀ: 254740007567
+│📡 HOSTER: *${os.platform()}*
+│🛡 ᴍᴏᴅᴇ: *${mode}*
+│💫 ᴘʀᴇғɪx: *[Multi-Prefix]*
+│💾 RAM: ${formatBytes(freeMemoryBytes)}/${formatBytes(totalMemoryBytes)}
+│⏳ UPTIME: ${day}d ${hours}h ${minutes}m ${seconds}s
+╰─────────────━┈⊷`
+            }),
+            footer: proto.Message.InteractiveMessage.Footer.create({
+              text: "Made By Marisel"
+            }),
+            buttons: [
+              {
+                buttonId: 'all_menu',
+                buttonText: { displayText: '🔖 ALL MENU' },
+                type: 1
+              },
+              {
+                buttonId: 'downloader_menu',
+                buttonText: { displayText: '📥 DOWNLOADER' },
+                type: 1
+              },
+              {
+                buttonId: 'group_menu',
+                buttonText: { displayText: '👥 GROUP' },
+                type: 1
+              },
+              {
+                buttonId: 'tool_menu',
+                buttonText: { displayText: '🛠️ TOOLS' },
+                type: 1
+              },
+              {
+                buttonId: 'main_menu',
+                buttonText: { displayText: '🏠 MAIN' },
+                type: 1
+              },
+              {
+                buttonId: 'owner_menu',
+                buttonText: { displayText: '👑 OWNER' },
+                type: 1
+              }
+            ],
+            contextInfo: {
+              mentionedJid: [m.sender],
+              forwardingScore: 999,
+              isForwarded: true,
+              forwardedNewsletterMessageInfo: {
+                newsletterJid: '120363249960769123@newsletter',
+                newsletterName: "Ethix-MD",
+                serverMessageId: 143
+              }
+            }
+          })
+        }
       }
-      console.error("❌ Failed to fetch primary image:", error);
+    }, {});
+
+    await Matrix.relayMessage(msg.key.remoteJid, msg.message, { messageId: msg.key.id });
+
+    // Button handler
+    const buttonHandler = async (update) => {
+      const message = update.messages[0];
+      if (!message || !message.key || message.key.remoteJid !== m.from) return;
+
       try {
-        const response = await axios.get(fallbackUrl, { responseType: "arraybuffer" });
-        return Buffer.from(response.data, "binary");
-      } catch (fallbackError) {
-        console.error("❌ Failed to fetch fallback image:", fallbackError);
-        return null;
+        if (message.message?.buttonsResponseMessage) {
+          const buttonId = message.message.buttonsResponseMessage.selectedButtonId;
+          let responseText = '';
+          let category = '';
+
+          switch (buttonId) {
+            case 'all_menu':
+              category = 'ALL MENU';
+              break;
+            case 'downloader_menu':
+              category = 'DOWNLOADER MENU';
+              break;
+            case 'group_menu':
+              category = 'GROUP MENU';
+              break;
+            case 'tool_menu':
+              category = 'TOOL MENU';
+              break;
+            case 'main_menu':
+              category = 'MAIN MENU';
+              break;
+            case 'owner_menu':
+              category = 'OWNER MENU';
+              break;
+            default:
+              return;
+          }
+
+          const menuData = menuCategories[category];
+          if (menuData) {
+            responseText = `╭───❮ *${category}* ❯───╮\n`;
+            responseText += `│📌 ${menuData.description}\n`;
+            responseText += `╰─────────────────╯\n\n`;
+            responseText += menuData.commands.join('\n');
+            responseText += `\n\n╭───❮ *SYSTEM INFO* ❯───╮\n`;
+            responseText += `│💾 RAM: ${formatBytes(freeMemoryBytes)}/${formatBytes(totalMemoryBytes)}\n`;
+            responseText += `│⏳ UPTIME: ${day}d ${hours}h ${minutes}m ${seconds}s\n`;
+            responseText += `╰─────────────────╯\n`;
+            responseText += `Made By Marisel`;
+
+            await Matrix.sendMessage(m.from, {
+              image: fs.readFileSync('./src/ethix.jpg'),
+              caption: responseText,
+              contextInfo: {
+                mentionedJid: [m.sender],
+                forwardingScore: 999,
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                  newsletterJid: '120363249960769123@newsletter',
+                  newsletterName: "Marisel",
+                  serverMessageId: 143
+                }
+              }
+            }, { quoted: m });
+          }
+        }
+      } catch (error) {
+        console.error("Button handler error:", error);
       }
-    }
-  }
-}
-
-const menu = async (m, Matrix) => {
-  const prefix = config.PREFIX;
-  const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).split(" ")[0].toLowerCase() : "";
-  const mode = config.MODE === "public" ? "public" : "private";
-  const totalCommands = 70;
-
-  const validCommands = ["list", "he", "me"];
-  const subMenuCommands = [
-    "download-menu",
-    "converter-menu",
-    "ai-menu",
-    "tools-menu",
-    "group-menu",
-    "search-menu",
-    "main-menu",
-    "owner-menu",
-    "stalk-menu",
-  ];
-
-  // Fetch image for all cases
-  const menuImage = await fetchMenuImage();
-
-  // Handle main menu
-  if (validCommands.includes(cmd)) {
-    const mainMenu = `
-╭─❒ 「 ${toFancyFont("Toxic-MD")} Command Menu ⚠ 」
-│
-│ 🤖 *${toFancyFont("Bot")}*: ${toFancyFont("Toxic-MD")}
-│ 📋 *${toFancyFont("Total Commands")}*: ${totalCommands}
-│ 🔣 *${toFancyFont("Prefix")}*: ${prefix}
-│ 🌐 *${toFancyFont("Mode")}*: ${mode}
-│ 📚 *${toFancyFont("Library")}*: Baileys
-╰─────────────
-
- ${pushwish} @*${m.pushName}*! Tap a button to select a menu category:
-
-> Pσɯҽɾҽԃ Ⴆყ Tσxιƈ-ɱԃȥ
-`;
-
-    const messageOptions = {
-      viewOnce: true,
-      buttons: [
-        {
-          buttonId: `${prefix}download-menu`,
-          buttonText: { displayText: `📥 ${toFancyFont("Download")}` },
-          type: 1,
-        },
-        {
-          buttonId: `${prefix}converter-menu`,
-          buttonText: { displayText: `🔄 ${toFancyFont("Converter")}` },
-          type: 1,
-        },
-        {
-          buttonId: `${prefix}ai-menu`,
-          buttonText: { displayText: `🤖 ${toFancyFont("AI")}` },
-          type: 1,
-        },
-        {
-          buttonId: `${prefix}tools-menu`,
-          buttonText: { displayText: `🛠 ${toFancyFont("Tools")}` },
-          type: 1,
-        },
-        {
-          buttonId: `${prefix}group-menu`,
-          buttonText: { displayText: `👥 ${toFancyFont("Group")}` },
-          type: 1,
-        },
-        {
-          buttonId: `${prefix}search-menu`,
-          buttonText: { displayText: `🔍 ${toFancyFont("Search")}` },
-          type: 1,
-        },
-        {
-          buttonId: `${prefix}main-menu`,
-          buttonText: { displayText: `⚙ ${toFancyFont("Main")}` },
-          type: 1,
-        },
-        {
-          buttonId: `${prefix}owner-menu`,
-          buttonText: { displayText: `🔒 ${toFancyFont("Owner")}` },
-          type: 1,
-        },
-        {
-          buttonId: `${prefix}stalk-menu`,
-          buttonText: { displayText: `🕵 ${toFancyFont("Stalk")}` },
-          type: 1,
-        },
-      ],
-      contextInfo: {
-        mentionedJid: [m.sender],
-        forwardingScore: 999,
-        isForwarded: true,
-      },
     };
 
-    // Send menu with or without image
-    if (menuImage) {
-      await Matrix.sendMessage(
-        m.from,
-        { image: menuImage, caption: mainMenu, ...messageOptions },
-        { quoted: m }
-      );
-    } else {
-      await Matrix.sendMessage(m.from, { text: mainMenu, ...messageOptions }, { quoted: m });
-    }
+    // Add event listener
+    Matrix.ev.on('messages.upsert', buttonHandler);
 
-    // Send audio as a voice note
-    await Matrix.sendMessage(
-      m.from,
-      { audio: { url: "https://files.catbox.moe/f4zaz4.mp3" }, mimetype: "audio/mp4", ptt: true },
-      { quoted: m }
-    );
-  }
-
-  // Handle sub-menu commands
-  if (subMenuCommands.includes(cmd)) {
-    let menuTitle;
-    let menuResponse;
-
-    switch (cmd) {
-      case "download-menu":
-        menuTitle = "Download";
-        menuResponse = `
-╭─❒ 「 ${toFancyFont("Download")} 📥 」
-│ ✘ *${toFancyFont("apk")}*
-│ ✘ *${toFancyFont("facebook")}*
-│ ✘ *${toFancyFont("mediafire")}*
-│ ✘ *${toFancyFont("pinters")}*
-│ ✘ *${toFancyFont("gitclone")}*
-│ ✘ *${toFancyFont("gdrive")}*
-│ ✘ *${toFancyFont("insta")}*
-│ ✘ *${toFancyFont("ytmp3")}*
-│ ✘ *${toFancyFont("ytmp4")}*
-│ ✘ *${toFancyFont("play")}*
-│ ✘ *${toFancyFont("song")}*
-│ ✘ *${toFancyFont("video")}*
-│ ✘ *${toFancyFont("ytmp3doc")}*
-│ ✘ *${toFancyFont("ytmp4doc")}*
-│ ✘ *${toFancyFont("tiktok")}*
-╰─────────────
-`;
-        break;
-
-      case "converter-menu":
-        menuTitle = "Converter";
-        menuResponse = `
-╭─❒ 「 ${toFancyFont("Converter")} 🔄 」
-│ ✘ *${toFancyFont("attp")}*
-│ ✘ *${toFancyFont("attp2")}*
-│ ✘ *${toFancyFont("attp3")}*
-│ ✘ *${toFancyFont("ebinary")}*
-│ ✘ *${toFancyFont("dbinary")}*
-│ ✘ *${toFancyFont("emojimix")}*
-│ ✘ *${toFancyFont("mp3")}*
-╰─────────────
-`;
-        break;
-
-      case "ai-menu":
-        menuTitle = "AI";
-        menuResponse = `
-╭─❒ 「 ${toFancyFont("AI")} 🤖 」
-│ ✘ *${toFancyFont("ai")}*
-│ ✘ *${toFancyFont("bug")}*
-│ ✘ *${toFancyFont("report")}*
-│ ✘ *${toFancyFont("gpt")}*
-│ ✘ *${toFancyFont("dalle")}*
-│ ✘ *${toFancyFont("remini")}*
-│ ✘ *${toFancyFont("gemini")}*
-╰─────────────
-`;
-        break;
-
-      case "tools-menu":
-        menuTitle = "Tools";
-        menuResponse = `
-╭─❒ 「 ${toFancyFont("Tools")} 🛠 」
-│ ✘ *${toFancyFont("calculator")}*
-│ ✘ *${toFancyFont("tempmail")}*
-│ ✘ *${toFancyFont("checkmail")}*
-│ ✘ *${toFancyFont("trt")}*
-│ ✘ *${toFancyFont("tts")}*
-╰─────────────
-`;
-        break;
-
-      case "group-menu":
-        menuTitle = "Group";
-        menuResponse = `
-╭─❒ 「 ${toFancyFont("Group")} 👥 」
-│ ✘ *${toFancyFont("linkgroup")}*
-│ ✘ *${toFancyFont("setppgc")}*
-│ ✘ *${toFancyFont("setname")}*
-│ ✘ *${toFancyFont("setdesc")}*
-│ ✘ *${toFancyFont("group")}*
-│ ✘ *${toFancyFont("gcsetting")}*
-│ ✘ *${toFancyFont("welcome")}*
-│ ✘ *${toFancyFont("add")}*
-│ ✘ *${toFancyFont("kick")}*
-│ ✘ *${toFancyFont("hidetag")}*
-│ ✘ *${toFancyFont("tagall")}*
-│ ✘ *${toFancyFont("antilink")}*
-│ ✘ *${toFancyFont("antitoxic")}*
-│ ✘ *${toFancyFont("promote")}*
-│ ✘ *${toFancyFont("demote")}*
-│ ✘ *${toFancyFont("getbio")}*
-╰─────────────
-`;
-        break;
-
-      case "search-menu":
-        menuTitle = "Search";
-        menuResponse = `
-╭─❒ 「 ${toFancyFont("Search")} 🔍 」
-│ ✘ *${toFancyFont("play")}*
-│ ✘ *${toFancyFont("yts")}*
-│ ✘ *${toFancyFont("imdb")}*
-│ ✘ *${toFancyFont("google")}*
-│ ✘ *${toFancyFont("gimage")}*
-│ ✘ *${toFancyFont("pinterest")}*
-│ ✘ *${toFancyFont("wallpaper")}*
-│ ✘ *${toFancyFont("wikimedia")}*
-│ ✘ *${toFancyFont("ytsearch")}*
-│ ✘ *${toFancyFont("ringtone")}*
-│ ✘ *${toFancyFont("lyrics")}*
-╰─────────────
-`;
-        break;
-
-      case "main-menu":
-        menuTitle = "Main";
-        menuResponse = `
-╭─❒ 「 ${toFancyFont("Main")} ⚙ 」
-│ ✘ *${toFancyFont("ping")}*
-│ ✘ *${toFancyFont("alive")}*
-│ ✘ *${toFancyFont("owner")}*
-│ ✘ *${toFancyFont("menu")}*
-│ ✘ *${toFancyFont("infobot")}*
-╰─────────────
-`;
-        break;
-
-      case "owner-menu":
-        menuTitle = "Owner";
-        menuResponse = `
-╭─❒ 「 ${toFancyFont("Owner")} 🔒 」
-│ ✘ *${toFancyFont("join")}*
-│ ✘ *${toFancyFont("leave")}*
-│ ✘ *${toFancyFont("block")}*
-│ ✘ *${toFancyFont("unblock")}*
-│ ✘ *${toFancyFont("setppbot")}*
-│ ✘ *${toFancyFont("anticall")}*
-│ ✘ *${toFancyFont("setstatus")}*
-│ ✘ *${toFancyFont("setnamebot")}*
-│ ✘ *${toFancyFont("autotyping")}*
-│ ✘ *${toFancyFont("alwaysonline")}*
-│ ✘ *${toFancyFont("autoread")}*
-│ ✘ *${toFancyFont("autosview")}*
-╰─────────────
-`;
-        break;
-
-      case "stalk-menu":
-        menuTitle = "Stalk";
-        menuResponse = `
-╭─❒ 「 ${toFancyFont("Stalk")} 🕵 」
-│ ✘ *${toFancyFont("truecaller")}*
-│ ✘ *${toFancyFont("instastalk")}*
-│ ✘ *${toFancyFont("githubstalk")}*
-╰─────────────
-`;
-        break;
-
-      default:
-        return;
-    }
-
-    // Format the full response
-    const fullResponse = `
-╭─❒ 「 ${toFancyFont("Toxic-MD")} - ${toFancyFont(menuTitle)} ⚠ 」
-│
-│ 🤖 *${toFancyFont("Bot")}*: ${toFancyFont("Toxic-MD")}
-│ 👤 *${toFancyFont("User")}*: ${m.pushName}
-│ 🔣 *${toFancyFont("Prefix")}*: ${prefix}
-│ 📚 *${toFancyFont("Library")}*: Baileys
-╰─────────────
-
-${menuResponse}
-
-> Pσɯҽ Macau Tσxιƈ-ɱԃȥ
-`;
-
-    // Send sub-menu with or without image
-    if (menuImage) {
-      await Matrix.sendMessage(
-        m.from,
-        {
-          image: menuImage,
-          caption: fullResponse,
-          contextInfo: {
-            mentionedJid: [m.sender],
-            forwardingScore: 999,
-            isForwarded: true,
-          },
-        },
-        { quoted: m }
-      );
-    } else {
-      await Matrix.sendMessage(m.from, { text: fullResponse }, { quoted: m });
-    }
+    // Remove listener after 5 minutes
+    setTimeout(() => {
+      Matrix.ev.off('messages.upsert', buttonHandler);
+    }, 300000);
   }
 };
 
-export default menu;
+export default test;
