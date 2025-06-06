@@ -57,7 +57,7 @@ const test = async (m, Matrix) => {
   const prefix = /^[\\/!#.]/gi.test(m.body) ? m.body.match(/^[\\/!#.]/gi)[0] : '.';
   const cmd = m.body.startsWith(prefix) ? m.body.slice(prefix.length).toLowerCase() : '';
   
-  if (['list', 'help', 'menu'].includes(cmd)) {
+  if (['lis', 'hel', 'men'].includes(cmd)) {
     const greeting = getGreeting();
     const mode = process.env.MODE || 'public';
     
