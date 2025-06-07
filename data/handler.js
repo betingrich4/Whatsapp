@@ -5,6 +5,7 @@ import config from '../../config.cjs';
 import { smsg } from '../../lib/myfunc.cjs';
 import { handleAntilink } from './antilink.js';
 
+
 const userCommandCounts = new Map();
 
 const __filename = new URL(import.meta.url).pathname;
@@ -38,44 +39,12 @@ const Handler = async (chatUpdate, sock, logger, store) => {
         const m = serialize(JSON.parse(JSON.stringify(chatUpdate.messages[0])), sock, logger);
         if (!m.message) return;
 
-        // Handle button responses first
-        if (m.message?.buttonsResponseMessage) {
-            const buttonId = m.message.buttonsResponseMessage.selectedButtonId;
-            const buttonHandler = {
-                'menu': () => handleMenuButton(m, sock),
-                'speed': () => handleSpeedButton(m, sock),
-                'deploy': () => handleDeployButton(m, sock),
-                'follow': () => handleFollowButton(m, sock),
-                'huf': () => handleHufButton(m, sock)
-            };
-            
-            if (buttonHandler[buttonId]) {
-                await buttonHandler[buttonId]();
-                return;
-            }
-        }
-
-        // Handle list responses
-        if (m.message?.listResponseMessage) {
-            const selectedId = m.message.listResponseMessage.singleSelectReply.selectedRowId;
-            const listHandler = {
-                'View All Menu': () => handleAllMenu(m, sock),
-                'Downloader Menu': () => handleDownloaderMenu(m, sock),
-                // Add other list options here
-            };
-            
-            if (listHandler[selectedId]) {
-                await listHandler[selectedId]();
-                return;
-            }
-        }
-
-        // Rest of your existing handler logic
         const participants = m.isGroup ? await sock.groupMetadata(m.from).then(metadata => metadata.participants) : [];
         const groupAdmins = m.isGroup ? getGroupAdmins(participants) : [];
         const botId = sock.user.id.split(':')[0] + '@s.whatsapp.net';
         const isBotAdmins = m.isGroup ? groupAdmins.includes(botId) : false;
         const isAdmins = m.isGroup ? groupAdmins.includes(m.sender) : false;
+
 
         const PREFIX = /^[\\/!#.]/;
         const isCOMMAND = (body) => PREFIX.test(body);
@@ -104,7 +73,7 @@ const Handler = async (chatUpdate, sock, logger, store) => {
             }
         }
 
-        await handleAntilink(m, sock, logger, isBotAdmins, isAdmins, isCreator); 
+await handleAntilink(m, sock, logger, isBotAdmins, isAdmins, isCreator); 
 
         const { isGroup, type, sender, from, body } = m;
         console.log(m);
@@ -122,35 +91,5 @@ const Handler = async (chatUpdate, sock, logger, store) => {
         console.log(e);
     }
 };
-
-// Button handlers
-async function handleMenuButton(m, sock) {
-    await sock.sendMessage(m.from, { text: "📋 Menu options selected" }, { quoted: m });
-}
-
-async function handleSpeedButton(m, sock) {
-    await sock.sendMessage(m.from, { text: "⚡ Speed test initiated" }, { quoted: m });
-}
-
-async function handleDeployButton(m, sock) {
-    await sock.sendMessage(m.from, { text: "🚀 Deployment options" }, { quoted: m });
-}
-
-async function handleFollowButton(m, sock) {
-    await sock.sendMessage(m.from, { text: "👥 Follow options" }, { quoted: m });
-}
-
-async function handleHufButton(m, sock) {
-    await sock.sendMessage(m.from, { text: "💎 HUF options" }, { quoted: m });
-}
-
-// List handlers
-async function handleAllMenu(m, sock) {
-    await sock.sendMessage(m.from, { text: "🔖 All menu commands here..." }, { quoted: m });
-}
-
-async function handleDownloaderMenu(m, sock) {
-    await sock.sendMessage(m.from, { text: "📥 Downloader commands here..." }, { quoted: m });
-}
 
 export default Handler;
