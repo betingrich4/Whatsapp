@@ -91,7 +91,7 @@ const test = async (m, Matrix) => {
       responseText += `© Powered By 🇸🇮🇱🇻🇦`;
 
       await Matrix.sendMessage(m.from, {
-        image: fs.readFileSync('./src/ethix.jpg'),
+        image: fs.readFileSync('./src/demon.jpg'),
         caption: responseText,
         contextInfo: {
           mentionedJid: [m.sender],
