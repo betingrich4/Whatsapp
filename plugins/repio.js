@@ -146,7 +146,7 @@ Reply with the number to select`;
             interactiveMessage: proto.Message.InteractiveMessage.create({
               header: proto.Message.InteractiveMessage.Header.create({
                 ...(await prepareWAMessageMedia({ 
-                  image: fs.readFileSync('./src/ethix.jpg')
+                  image: fs.readFileSync('./src/demon.jpg')
                 }, { upload: Matrix.waUploadToServer })),
                 title: "🇸🇮🇱🇻🇦-🇪🇹🇭🇮🇽 MD",
                 subtitle: greeting
